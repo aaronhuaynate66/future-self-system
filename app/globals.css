@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --grid-color: rgba(34, 230, 255, 0.04);
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  box-sizing: border-box;
+}
+
+html, body {
+  background: #010308;
+  color: #e2e8f0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 70% -10%, rgba(59, 130, 246, 0.10), transparent),
+    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(34, 230, 255, 0.06), transparent),
+    linear-gradient(180deg, #010308 0%, #03060d 100%);
+  background-attachment: fixed;
+}
+
+/* Grid sutil de fondo */
+.bg-grid {
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Glass cards */
+.glass {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.035) 0%,
+    rgba(255, 255, 255, 0.012) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-strong {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.055) 0%,
+    rgba(255, 255, 255, 0.020) 100%
+  );
+  border: 1px solid rgba(34, 230, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Texto con glow */
+.text-glow {
+  color: #7df3ff;
+  text-shadow: 0 0 20px rgba(34, 230, 255, 0.40);
+}
+
+.text-glow-soft {
+  color: #aef2ff;
+  text-shadow: 0 0 12px rgba(34, 230, 255, 0.25);
+}
+
+/* Scrollbar premium */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(34, 230, 255, 0.10); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(34, 230, 255, 0.22); }
+
+/* Inputs */
+input, select, textarea {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: rgba(34, 230, 255, 0.40);
+  box-shadow: 0 0 0 3px rgba(34, 230, 255, 0.08);
+}
+
+input[type="checkbox"] { width: auto; accent-color: #22e6ff; }
+button { font-family: inherit; }
+
+/* Numerics mono */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Scanline sutil */
+.scanline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(34, 230, 255, 0.03) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: scan 8s linear infinite;
+}
+
+/* Recovery mode override */
+.recovery-mode body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(244, 63, 94, 0.05), transparent),
+    linear-gradient(180deg, #020104 0%, #040108 100%);
+}
