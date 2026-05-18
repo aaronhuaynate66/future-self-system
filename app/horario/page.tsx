@@ -9,9 +9,9 @@ import { useCalendar } from "@/lib/useCalendar";
 import { paletteFor, formatDuration, msUntil, analyzeDay, type CalEvent } from "@/lib/calendar";
 import type { DayKey, ScheduleBlock } from "@/types";
 
-const ROW_H     = 56;
+const ROW_H       = 64;
 const TOTAL_HOURS = HOUR_END - HOUR_START;
-const GRID_H    = TOTAL_HOURS * ROW_H;
+const GRID_H      = TOTAL_HOURS * ROW_H;
 
 function positionTop(hhmm: string): number {
   const m = minutesOf(hhmm) - HOUR_START * 60;
@@ -43,40 +43,55 @@ function NowIndicator({ top }: { top: number }) {
 function CalBlock({ event, isActive }: { event: CalEvent; isActive: boolean }) {
   const top    = positionTopMs(event.start);
   const bottom = positionTopMs(event.end);
-  const height = Math.max(20, bottom - top - 2);
+  const height = Math.max(22, bottom - top - 2);
   const pal    = paletteFor(event.category);
+
+  const startStr = event.start.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
+  const endStr   = event.end.toLocaleTimeString("es-PE",   { hour: "2-digit", minute: "2-digit" });
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="absolute left-0.5 right-0.5 overflow-hidden rounded-lg border transition-all hover:z-20 hover:scale-[1.02]"
+      className="absolute left-0.5 right-0.5 overflow-hidden rounded-lg border transition-all cursor-default"
       style={{
         top, height,
-        background: isActive ? `${pal.bg} ` : pal.bg,
-        borderColor: isActive ? pal.color : pal.border,
-        boxShadow: isActive ? `0 0 16px ${pal.color}44, inset 0 0 12px ${pal.color}11` : "none",
-        zIndex: isActive ? 10 : 1,
+        background:  isActive ? `${pal.bg}` : pal.bg,
+        borderColor: isActive ? pal.color   : pal.border,
+        boxShadow:   isActive ? `0 0 14px ${pal.color}55, inset 0 0 10px ${pal.color}0a` : "none",
+        zIndex: isActive ? 10 : 2,
       }}
-      title={`${event.start.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}–${event.end.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })} · ${event.title}`}
+      title={`${startStr}–${endStr} · ${event.title}`}
     >
-      <div className="flex h-full flex-col px-1.5 py-1">
-        {isActive && (
-          <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg" style={{ background: pal.color, boxShadow: `0 0 8px ${pal.color}` }} />
-        )}
-        <div className="flex items-center gap-1">
-          <div className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: pal.color }} />
-          <div className="truncate text-[10px] font-semibold leading-tight" style={{ color: pal.text }}>
-            {event.title}
-          </div>
+      {/* barra lateral activa */}
+      {isActive && (
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
+          style={{ background: pal.color, boxShadow: `0 0 6px ${pal.color}` }} />
+      )}
+
+      <div className="flex h-full flex-col px-2 py-1 pl-2.5">
+        {/* Título — siempre visible */}
+        <div
+          className="truncate font-semibold leading-snug"
+          style={{
+            color:    pal.text,
+            fontSize: height < 36 ? "10px" : "11px",
+          }}
+        >
+          {event.title}
         </div>
-        {height > 36 && (
-          <div className="mt-0.5 font-mono text-[9px] opacity-50" style={{ color: pal.text }}>
-            {event.start.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}
+
+        {/* Hora — si hay espacio */}
+        {height >= 36 && (
+          <div className="mt-0.5 font-mono text-[10px] tabular-nums" style={{ color: pal.color, opacity: 0.8 }}>
+            {startStr}–{endStr}
           </div>
         )}
-        {isActive && height > 50 && (
-          <div className="mt-auto text-[8px] font-bold uppercase tracking-widest" style={{ color: pal.color }}>
+
+        {/* Badge AHORA */}
+        {isActive && height >= 52 && (
+          <div className="mt-auto self-start rounded-sm px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest"
+            style={{ background: `${pal.color}22`, color: pal.color }}>
             AHORA
           </div>
         )}
@@ -94,22 +109,27 @@ function ScheduleBlock({ block, isCurrent }: { block: ScheduleBlock; isCurrent: 
   const height = Math.max(16, bottom - top - 2);
   const p      = ACTIVITY_PALETTE[block.kind];
 
+  // Bloques de fondo muy sutiles — no compiten con eventos reales
   return (
     <div
-      className="absolute left-0.5 right-0.5 overflow-hidden rounded-md border"
-      style={{
-        top, height,
-        background: isCurrent ? p.bg : `${p.bg.replace("0.10", "0.05").replace("0.12", "0.05")}`,
-        borderColor: isCurrent ? p.border : p.border.replace("0.35", "0.12").replace("0.30", "0.10"),
-        opacity: 0.55,
-      }}
+      className="absolute left-0 right-0 overflow-hidden"
+      style={{ top, height, zIndex: 1 }}
       title={`${block.start}–${block.end} · ${block.label}`}
     >
-      <div className="flex h-full items-start px-1.5 py-1">
-        <div className="truncate text-[9px] font-medium opacity-70" style={{ color: p.text }}>
+      {/* Solo una línea de color muy sutil en el borde izquierdo */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-[2px]"
+        style={{ background: p.color, opacity: isCurrent ? 0.25 : 0.08 }}
+      />
+      {/* Texto extremadamente sutil */}
+      {height >= 32 && (
+        <div
+          className="absolute left-3 top-1 truncate text-[9px] font-medium"
+          style={{ color: p.text, opacity: isCurrent ? 0.18 : 0.08 }}
+        >
           {block.label}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -128,15 +148,25 @@ function DayColumn({
   currentEventId: string | null;
 }) {
   return (
-    <div className={`relative border-r border-white/[0.03] ${isToday ? "bg-cyan-400/[0.008]" : ""}`} style={{ height: GRID_H }}>
-      {/* Schedule base (fondo) */}
+    <div className={`relative border-r border-white/[0.03] ${isToday ? "bg-cyan-400/[0.012]" : ""}`} style={{ height: GRID_H }}>
+      {/* Líneas horizontales por hora */}
+      {Array.from({ length: TOTAL_HOURS }, (_, i) => (
+        <div
+          key={i}
+          className="absolute left-0 right-0 border-t border-white/[0.04]"
+          style={{ top: i * ROW_H }}
+        />
+      ))}
+
+      {/* Schedule base (guías de fondo) */}
       {scheduleBlocks.map((b, i) => {
-        const mins = minutesOf(b.start) - HOUR_START * 60;
-        const isCur = isToday && mins <= (new Date().getHours() * 60 + new Date().getMinutes() - HOUR_START * 60) && (minutesOf(b.end) - HOUR_START * 60) > (new Date().getHours() * 60 + new Date().getMinutes() - HOUR_START * 60);
+        const mins   = minutesOf(b.start) - HOUR_START * 60;
+        const nowMin = new Date().getHours() * 60 + new Date().getMinutes() - HOUR_START * 60;
+        const isCur  = isToday && mins <= nowMin && (minutesOf(b.end) - HOUR_START * 60) > nowMin;
         return <ScheduleBlock key={i} block={b} isCurrent={isToday && isCur} />;
       })}
 
-      {/* Calendar events (encima) */}
+      {/* Calendar events (protagonistas) */}
       {calEvents.map(ev => (
         <CalBlock key={ev.id} event={ev} isActive={isToday && ev.id === currentEventId} />
       ))}
@@ -332,15 +362,13 @@ export default function HorarioPage() {
 
         {/* Grid */}
         <div className="flex">
-          {/* Hour labels */}
+        {/* Hour labels */}
           <div className="relative w-12 shrink-0 border-r border-white/[0.04]" style={{ height: GRID_H }}>
             {Array.from({ length: TOTAL_HOURS }, (_, i) => (
-              <div
-                key={i}
-                className="absolute right-2 font-mono text-[9px] text-slate-700"
-                style={{ top: i * ROW_H - 6 }}
-              >
-                {String(HOUR_START + i).padStart(2, "0")}
+              <div key={i} style={{ position: "absolute", top: i * ROW_H, left: 0, right: 0 }}>
+                <div className="pr-2 text-right font-mono text-[10px] text-slate-600 leading-none" style={{ marginTop: -6 }}>
+                  {String(HOUR_START + i).padStart(2, "0")}
+                </div>
               </div>
             ))}
           </div>
