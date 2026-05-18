@@ -149,3 +149,60 @@ export interface AppState {
   health: HealthState;
   projects: Project[];
 }
+
+// ============================================================
+// FINANCIAL OS
+// ============================================================
+
+export type TransactionType = "income" | "expense" | "saving";
+
+export type SpendingIntent = "obligatorio" | "necesario" | "no_esencial";
+
+export type FinanceCategory =
+  | "sueldo"
+  | "freelance"
+  | "clases"
+  | "otro_ingreso"
+  | "vivienda"
+  | "servicios"
+  | "alimentacion"
+  | "transporte"
+  | "salud"
+  | "gym"
+  | "educacion"
+  | "delivery"
+  | "entretenimiento"
+  | "ropa"
+  | "hormiga"
+  | "ahorro"
+  | "inversion"
+  | "otro";
+
+export interface Transaction {
+  id: string;
+  date: string;           // yyyy-mm-dd
+  amount: number;         // en PEN
+  type: TransactionType;
+  category: FinanceCategory;
+  intent: SpendingIntent | null; // solo para expenses
+  note: string;
+}
+
+export interface MonthlyBudget {
+  month: string;          // yyyy-mm
+  incomeGoal: number;
+  savingGoal: number;
+  categories: Partial<Record<FinanceCategory, number>>;
+}
+
+export interface FinancialAlert {
+  id: string;
+  level: "info" | "warning" | "critical";
+  message: string;
+  createdAt: string;
+}
+
+export interface FinancialOS {
+  transactions: Transaction[];
+  budgets: MonthlyBudget[];
+}

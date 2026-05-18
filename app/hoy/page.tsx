@@ -9,6 +9,8 @@ import { summarizeWeek, getSystemMode, TIER_META } from "@/lib/score";
 import { currentAndNext, timeUntilNext } from "@/lib/schedule";
 import { todayIso, formatLongDate } from "@/lib/dates";
 import { ACTIVITY_PALETTE } from "@/data/schedule";
+import { useCalendar } from "@/lib/useCalendar";
+import { paletteFor, formatDuration, msUntil } from "@/lib/calendar";
 import { MISSION, MISSION_SUB } from "@/data/rules";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -82,6 +84,7 @@ function MentalSemaphore({ peace }: { peace: "verde" | "amarillo" | "rojo" | nul
 // ----------------------------------------------------------------
 function CurrentBlockPanel() {
   const [now, setNow] = useState<Date | null>(null);
+  const cal = useCalendar();
 
   useEffect(() => {
     setNow(new Date());
@@ -91,49 +94,58 @@ function CurrentBlockPanel() {
 
   if (!now) return null;
 
+  // Prioridad: evento real del calendario → fallback horario fijo
+  const calCurrent = cal.current;
+  const calNext    = cal.next;
   const { current, next, progress } = currentAndNext(now);
   const timeUntil = timeUntilNext(next, now);
 
+  const showCalEvent = !!calCurrent;
+  const showCalNext  = !!calNext;
+
   return (
-    <Card title="Ahora" hint="Timeline" className="col-span-full md:col-span-2">
+    <Card title="Ahora" hint={cal.loading ? "Sincronizando…" : cal.error ? "Sin conexión" : "Calendario real"} className="col-span-full md:col-span-2">
       <div className="space-y-3">
-        {/* Bloque actual */}
-        {current ? (
-          <div
-            className="rounded-xl border p-4"
-            style={{
-              background: ACTIVITY_PALETTE[current.kind].bg,
-              borderColor: ACTIVITY_PALETTE[current.kind].border,
-            }}
-          >
+        {/* Evento real del calendario */}
+        {showCalEvent ? (() => {
+          const pal = paletteFor(calCurrent!.category);
+          const remaining = msUntil(calCurrent!.end, now);
+          const total     = calCurrent!.end.getTime() - calCurrent!.start.getTime();
+          const prog      = Math.max(0, Math.min(1, 1 - remaining / total));
+          return (
+            <div className="rounded-xl border p-4" style={{ background: pal.bg, borderColor: pal.border }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-2.5 w-2.5 rounded-full animate-pulse-dot" style={{ background: pal.color, boxShadow: `0 0 8px ${pal.color}` }} />
+                  <div>
+                    <div className="text-sm font-medium" style={{ color: pal.text }}>{calCurrent!.title}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-slate-600">
+                      Termina en {formatDuration(remaining)}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono text-lg font-black" style={{ color: pal.color }}>{Math.round(prog * 100)}%</div>
+                  <div className="font-mono text-[10px] text-slate-600">
+                    {calCurrent!.start.toLocaleTimeString("es-PE",{hour:"2-digit",minute:"2-digit"})}–
+                    {calCurrent!.end.toLocaleTimeString("es-PE",{hour:"2-digit",minute:"2-digit"})}
+                  </div>
+                </div>
+              </div>
+              <ProgressBar value={prog} color={pal.color} height="thin" className="mt-3" />
+            </div>
+          );
+        })() : current ? (
+          <div className="rounded-xl border p-4" style={{ background: ACTIVITY_PALETTE[current.kind].bg, borderColor: ACTIVITY_PALETTE[current.kind].border }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div
-                  className="h-2.5 w-2.5 rounded-full animate-pulse-dot"
-                  style={{
-                    background: ACTIVITY_PALETTE[current.kind].color,
-                    boxShadow: `0 0 8px ${ACTIVITY_PALETTE[current.kind].color}`,
-                  }}
-                />
+                <div className="h-2.5 w-2.5 rounded-full animate-pulse-dot" style={{ background: ACTIVITY_PALETTE[current.kind].color, boxShadow: `0 0 8px ${ACTIVITY_PALETTE[current.kind].color}` }} />
                 <div>
-                  <div
-                    className="text-sm font-medium"
-                    style={{ color: ACTIVITY_PALETTE[current.kind].text }}
-                  >
-                    {current.label}
-                  </div>
-                  {current.detail && (
-                    <div className="text-[10px] uppercase tracking-widest text-slate-600">
-                      {current.detail}
-                    </div>
-                  )}
+                  <div className="text-sm font-medium" style={{ color: ACTIVITY_PALETTE[current.kind].text }}>{current.label}</div>
+                  {current.detail && <div className="text-[10px] uppercase tracking-widest text-slate-600">{current.detail}</div>}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-mono text-xs text-slate-500 tabular">
-                  {current.start}–{current.end}
-                </div>
-              </div>
+              <div className="font-mono text-xs text-slate-500 tabular">{current.start}–{current.end}</div>
             </div>
             <ProgressBar value={progress} color={ACTIVITY_PALETTE[current.kind].color} height="thin" className="mt-3" />
           </div>
@@ -146,25 +158,32 @@ function CurrentBlockPanel() {
           </div>
         )}
 
-        {/* Próximo bloque */}
-        {next && (
+        {/* Próximo */}
+        {(showCalNext || next) && (
           <div className="flex items-center gap-3 rounded-lg px-1">
             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-700" />
             <div className="flex flex-1 items-center justify-between">
               <div className="flex items-center gap-2">
-                <div
-                  className="h-1.5 w-1.5 rounded-full opacity-60"
-                  style={{ background: ACTIVITY_PALETTE[next.kind].color }}
-                />
-                <span className="text-xs text-slate-500">{next.label}</span>
+                {showCalNext ? (
+                  <>
+                    <div className="h-1.5 w-1.5 rounded-full opacity-60" style={{ background: paletteFor(calNext!.category).color }} />
+                    <span className="text-xs text-slate-400">{calNext!.title}</span>
+                  </>
+                ) : next ? (
+                  <>
+                    <div className="h-1.5 w-1.5 rounded-full opacity-60" style={{ background: ACTIVITY_PALETTE[next.kind].color }} />
+                    <span className="text-xs text-slate-500">{next.label}</span>
+                  </>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] text-slate-600 tabular">{next.start}</span>
-                {timeUntil && (
-                  <span className="text-[10px] uppercase tracking-widest text-slate-700">
-                    en {timeUntil}
+                {showCalNext ? (
+                  <span className="text-[10px] uppercase tracking-widest text-cyan-500">
+                    en {formatDuration(msUntil(calNext!.start, now))}
                   </span>
-                )}
+                ) : timeUntil ? (
+                  <span className="text-[10px] uppercase tracking-widest text-slate-700">en {timeUntil}</span>
+                ) : null}
               </div>
             </div>
           </div>
