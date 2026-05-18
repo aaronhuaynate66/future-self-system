@@ -19,7 +19,7 @@ export interface CalendarState {
   lastFetched: Date | null;
 }
 
-export function useCalendar(autoRefreshMs = 5 * 60 * 1000) {
+export function useCalendar(autoRefreshMs = 2 * 60 * 1000) {
   const [state, setState] = useState<CalendarState>({
     events: [],
     todayEvents: [],

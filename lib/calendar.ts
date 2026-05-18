@@ -62,16 +62,17 @@ const CATEGORY_RULES: { pattern: RegExp; cat: CalCategory }[] = [
   { pattern: /trabajo|work|proyecto|sprint|entrega|deadline/i, cat: "work"    },
 ];
 
-const CATEGORY_PALETTE: Record<CalCategory, { color: string; bg: string; border: string; text: string }> = {
-  gym:      { color: "#22d3a5", bg: "rgba(34,211,165,0.12)",  border: "rgba(34,211,165,0.40)",  text: "#6ee7b7" },
-  work:     { color: "#7c93b8", bg: "rgba(99,124,165,0.12)",  border: "rgba(99,124,165,0.35)",  text: "#a8bbd6" },
-  classes:  { color: "#fbbf24", bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.40)",  text: "#fde68a" },
-  meeting:  { color: "#22e6ff", bg: "rgba(34,230,255,0.10)",  border: "rgba(34,230,255,0.35)",  text: "#7df3ff" },
-  personal: { color: "#a78bfa", bg: "rgba(167,139,250,0.10)", border: "rgba(167,139,250,0.30)", text: "#c4b5fd" },
-  health:   { color: "#f43f5e", bg: "rgba(244,63,94,0.10)",   border: "rgba(244,63,94,0.30)",   text: "#fca5a5" },
-  finance:  { color: "#2dd4bf", bg: "rgba(45,212,191,0.10)",  border: "rgba(45,212,191,0.30)",  text: "#99f6e4" },
-  review:   { color: "#22e6ff", bg: "rgba(34,230,255,0.12)",  border: "rgba(34,230,255,0.45)",  text: "#7df3ff" },
-  other:    { color: "#64748b", bg: "rgba(100,116,139,0.08)", border: "rgba(100,116,139,0.25)", text: "#94a3b8" },
+const CATEGORY_PALETTE: Record<CalCategory, { color: string; bg: string; border: string; text: string; solid: string }> = {
+  // solid = color de fondo sólido estilo Outlook
+  gym:      { color: "#10b981", bg: "rgba(16,185,129,0.18)",  border: "rgba(16,185,129,0.50)",  text: "#ffffff", solid: "#065f46" },
+  work:     { color: "#3b82f6", bg: "rgba(59,130,246,0.18)",  border: "rgba(59,130,246,0.50)",  text: "#ffffff", solid: "#1e3a5f" },
+  classes:  { color: "#f59e0b", bg: "rgba(245,158,11,0.18)",  border: "rgba(245,158,11,0.55)",  text: "#ffffff", solid: "#78350f" },
+  meeting:  { color: "#6366f1", bg: "rgba(99,102,241,0.18)",  border: "rgba(99,102,241,0.50)",  text: "#ffffff", solid: "#312e81" },
+  personal: { color: "#ec4899", bg: "rgba(236,72,153,0.15)",  border: "rgba(236,72,153,0.45)",  text: "#ffffff", solid: "#831843" },
+  health:   { color: "#ef4444", bg: "rgba(239,68,68,0.15)",   border: "rgba(239,68,68,0.45)",   text: "#ffffff", solid: "#7f1d1d" },
+  finance:  { color: "#14b8a6", bg: "rgba(20,184,166,0.15)",  border: "rgba(20,184,166,0.45)",  text: "#ffffff", solid: "#134e4a" },
+  review:   { color: "#8b5cf6", bg: "rgba(139,92,246,0.18)",  border: "rgba(139,92,246,0.55)",  text: "#ffffff", solid: "#4c1d95" },
+  other:    { color: "#64748b", bg: "rgba(100,116,139,0.15)", border: "rgba(100,116,139,0.40)", text: "#e2e8f0", solid: "#1e293b" },
 };
 
 function detectCategory(title: string, description?: string): CalCategory {
@@ -82,7 +83,7 @@ function detectCategory(title: string, description?: string): CalCategory {
   return "other";
 }
 
-export function paletteFor(cat: CalCategory) {
+export function paletteFor(cat: CalCategory): { color: string; bg: string; border: string; text: string; solid: string } {
   return CATEGORY_PALETTE[cat];
 }
 
@@ -200,7 +201,7 @@ export async function parseICS(icsText: string): Promise<CalEvent[]> {
 // ────────────────────────────────────────────────────────────
 
 const CACHE_KEY    = "aaron_calendar_cache";
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos
 
 interface CacheEntry {
   events: { id: string; title: string; start: string; end: string; allDay: boolean; location?: string; description?: string; category: CalCategory; color: string; textColor: string; recurrent: boolean }[];

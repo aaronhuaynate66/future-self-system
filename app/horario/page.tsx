@@ -53,45 +53,58 @@ function CalBlock({ event, isActive }: { event: CalEvent; isActive: boolean }) {
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="absolute left-0.5 right-0.5 overflow-hidden rounded-lg border transition-all cursor-default"
+      className="absolute left-0.5 right-0.5 overflow-hidden rounded-md cursor-default select-none"
       style={{
-        top, height,
-        background:  isActive ? `${pal.bg}` : pal.bg,
-        borderColor: isActive ? pal.color   : pal.border,
-        boxShadow:   isActive ? `0 0 14px ${pal.color}55, inset 0 0 10px ${pal.color}0a` : "none",
+        top,
+        height,
+        // Fondo sólido oscuro con tinte de color — máximo contraste
+        background: isActive
+          ? `linear-gradient(135deg, ${pal.solid} 0%, color-mix(in srgb, ${pal.solid} 80%, ${pal.color} 20%) 100%)`
+          : pal.solid,
+        // Borde izquierdo grueso — estilo Outlook
+        borderLeft: `3px solid ${pal.color}`,
+        borderTop: `1px solid ${pal.color}44`,
+        borderRight: `1px solid ${pal.color}22`,
+        borderBottom: `1px solid ${pal.color}22`,
+        boxShadow: isActive
+          ? `0 0 0 1px ${pal.color}55, 0 4px 16px ${pal.color}33`
+          : `0 1px 3px rgba(0,0,0,0.4)`,
         zIndex: isActive ? 10 : 2,
       }}
       title={`${startStr}–${endStr} · ${event.title}`}
     >
-      {/* barra lateral activa */}
-      {isActive && (
-        <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
-          style={{ background: pal.color, boxShadow: `0 0 6px ${pal.color}` }} />
-      )}
-
-      <div className="flex h-full flex-col px-2 py-1 pl-2.5">
-        {/* Título — siempre visible */}
+      <div className="flex h-full flex-col px-2 py-1">
+        {/* Título — blanco puro, siempre legible */}
         <div
-          className="truncate font-semibold leading-snug"
+          className="font-semibold leading-snug text-white"
           style={{
-            color:    pal.text,
-            fontSize: height < 36 ? "10px" : "11px",
-          }}
+            fontSize: height < 32 ? "10px" : "11px",
+            // Si es muy pequeño, una sola línea. Si hay espacio, 2 líneas.
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: height < 48 ? 1 : 2,
+            WebkitBoxOrient: "vertical",
+          } as React.CSSProperties}
         >
           {event.title}
         </div>
 
-        {/* Hora — si hay espacio */}
+        {/* Hora — color de acento, legible */}
         {height >= 36 && (
-          <div className="mt-0.5 font-mono text-[10px] tabular-nums" style={{ color: pal.color, opacity: 0.8 }}>
-            {startStr}–{endStr}
+          <div
+            className="mt-0.5 font-mono tabular-nums font-medium"
+            style={{ fontSize: "10px", color: pal.color, opacity: 0.9 }}
+          >
+            {startStr} – {endStr}
           </div>
         )}
 
         {/* Badge AHORA */}
-        {isActive && height >= 52 && (
-          <div className="mt-auto self-start rounded-sm px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest"
-            style={{ background: `${pal.color}22`, color: pal.color }}>
+        {isActive && height >= 56 && (
+          <div
+            className="mt-auto self-start rounded px-1.5 py-px font-black uppercase tracking-widest text-white"
+            style={{ fontSize: "8px", background: `${pal.color}55` }}
+          >
             AHORA
           </div>
         )}
@@ -295,21 +308,24 @@ export default function HorarioPage() {
         </div>
         <div className="flex items-center gap-2">
           {cal.error ? (
-            <span title="Sin datos del calendario" className="flex items-center gap-1 text-[10px] text-yellow-400">
-              <WifiOff size={12} /> Offline
+            <span className="flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400">
+              <WifiOff size={10} /> Sin conexión
             </span>
           ) : cal.loading ? (
-            <span className="text-[10px] text-slate-600">Sincronizando…</span>
+            <span className="flex items-center gap-1 text-[10px] text-slate-500">
+              <RefreshCw size={10} className="animate-spin" /> Actualizando…
+            </span>
           ) : (
-            <span title="Calendario sincronizado" className="flex items-center gap-1 text-[10px] text-slate-600">
-              <Wifi size={11} className="text-cyan-500" />
-              {cal.lastFetched?.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}
+            <span className="flex items-center gap-1 text-[10px] text-slate-600">
+              <Wifi size={10} className="text-emerald-500" />
+              Sync {cal.lastFetched?.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
           <button
             onClick={cal.refresh}
             disabled={cal.loading}
-            className="rounded-lg border border-white/[0.06] p-1.5 text-slate-500 transition-all hover:text-slate-300 disabled:opacity-30"
+            className="rounded-lg border border-white/[0.06] p-1.5 text-slate-500 transition-all hover:border-cyan-400/30 hover:text-cyan-400 disabled:opacity-30"
+            title="Forzar actualización"
           >
             <RefreshCw size={13} className={cal.loading ? "animate-spin" : ""} />
           </button>
