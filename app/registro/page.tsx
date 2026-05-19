@@ -20,6 +20,8 @@ const EMPTY: DailyLog = {
   peace: "amarillo",
   sleep: "regular",
   migraine: false,
+  migraineHour: undefined,
+  migraineDuration: undefined,
   argued: false,
   note: "",
 };

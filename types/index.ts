@@ -15,6 +15,8 @@ export interface DailyLog {
   peace: PeaceFlag;
   sleep: SleepFlag;
   migraine: boolean;
+  migraineHour?: string;      // HH:MM
+  migraineDuration?: number;  // minutos
   argued: boolean;
   note: string;
 }

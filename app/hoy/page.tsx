@@ -321,6 +321,70 @@ function DailyChecklistPanel() {
             height="thin"
           />
         </div>
+
+        {/* Migraña */}
+        <div className="mt-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm">🧠</span>
+              <span className="text-sm text-slate-500">Migraña</span>
+            </div>
+            <button
+              onClick={() => upsert({
+                migraine: !log?.migraine,
+                migraineHour: !log?.migraine ? `${new Date().getHours().toString().padStart(2,"0")}:${new Date().getMinutes().toString().padStart(2,"0")}` : undefined,
+                migraineDuration: !log?.migraine ? 60 : undefined,
+              })}
+              className={`relative h-5 w-9 rounded-full border transition-all ${
+                log?.migraine
+                  ? "border-red-500/50 bg-red-500/20"
+                  : "border-white/[0.08] bg-white/[0.04]"
+              }`}
+            >
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full transition-all ${
+                log?.migraine ? "left-4 bg-red-400" : "left-0.5 bg-slate-600"
+              }`} />
+            </button>
+          </div>
+
+          {log?.migraine && (
+            <div className="mt-3 flex gap-2">
+              <div className="flex-1">
+                <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-600">Hora inicio</label>
+                <input
+                  type="time"
+                  value={log.migraineHour ?? ""}
+                  onChange={e => upsert({ migraineHour: e.target.value })}
+                  className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 py-1.5 text-xs text-white focus:border-red-400/40 focus:outline-none"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-600">Duración</label>
+                <select
+                  value={log.migraineDuration ?? 60}
+                  onChange={e => upsert({ migraineDuration: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-white/[0.08] bg-[#0d1825] px-2 py-1.5 text-xs text-white focus:border-red-400/40 focus:outline-none"
+                >
+                  {[15,30,45,60,90,120,180,240,300,360,480].map(m => (
+                    <option key={m} value={m}>
+                      {m < 60 ? `${m}min` : `${m/60}h${m%60 ? ` ${m%60}min` : ""}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {log?.migraine && log.migraineHour && (
+            <div className="mt-2 text-[10px] text-red-400/70">
+              Inicio {log.migraineHour} · {log.migraineDuration
+                ? log.migraineDuration < 60
+                  ? `${log.migraineDuration}min`
+                  : `${Math.floor(log.migraineDuration/60)}h${log.migraineDuration%60 ? ` ${log.migraineDuration%60}min` : ""}`
+                : ""}
+            </div>
+          )}
+        </div>
       </div>
     </Card>
   );
