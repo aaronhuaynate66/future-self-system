@@ -351,12 +351,18 @@ function DailyChecklistPanel() {
             <div className="mt-3 flex gap-2">
               <div className="flex-1">
                 <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-600">Hora inicio</label>
-                <input
-                  type="time"
+                <select
                   value={log.migraineHour ?? ""}
                   onChange={e => upsert({ migraineHour: e.target.value })}
-                  className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 py-1.5 text-xs text-white focus:border-red-400/40 focus:outline-none"
-                />
+                  className="w-full rounded-lg border border-white/[0.08] bg-[#0d1825] px-2 py-1.5 text-xs text-white focus:border-red-400/40 focus:outline-none"
+                >
+                  <option value="">—</option>
+                  {Array.from({ length: 24 * 4 }, (_, i) => {
+                    const h = Math.floor(i / 4).toString().padStart(2, "0");
+                    const m = ((i % 4) * 15).toString().padStart(2, "0");
+                    return <option key={i} value={`${h}:${m}`}>{`${h}:${m}`}</option>;
+                  })}
+                </select>
               </div>
               <div className="flex-1">
                 <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-600">Duración</label>
