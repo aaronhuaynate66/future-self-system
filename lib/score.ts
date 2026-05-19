@@ -103,3 +103,30 @@ export function summarizeWeek(logs: DailyLog[], reference: Date | string): WeekS
 export function getSystemMode(score: number): SystemMode {
   return score <= RECOVERY_THRESHOLD ? "RECOVERY" : "NORMAL";
 }
+
+// ── Auto-detección desde calendario ──────────────────────────
+
+import { type CalEvent } from "@/lib/calendar";
+
+/**
+ * Dado los eventos del calendario de un día,
+ * devuelve parches automáticos para el DailyLog.
+ */
+export function autoDetectFromCalendar(events: CalEvent[]): {
+  trained: boolean;
+  heavyDay: boolean;
+  lateNight: boolean;
+} {
+  const trained = events.some(e => e.category === "gym");
+
+  // Más de 5h de trabajo/reuniones = día pesado
+  const workMinutes = events
+    .filter(e => e.category === "work" || e.category === "meeting")
+    .reduce((acc, e) => acc + (e.end.getTime() - e.start.getTime()) / 60000, 0);
+  const heavyDay = workMinutes > 5 * 60;
+
+  // Algún evento termina después de las 22:00
+  const lateNight = events.some(e => e.end.getHours() >= 22);
+
+  return { trained, heavyDay, lateNight };
+}

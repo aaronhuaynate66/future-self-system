@@ -7,6 +7,7 @@ import { summarizeWeek } from "@/lib/score";
 import { todayIso, formatTime } from "@/lib/dates";
 import { StatusBadge } from "@/components/ui/Badge";
 import { TIER_META } from "@/lib/score";
+import { MobileMenuButton } from "@/components/Sidebar";
 
 export function Header() {
   const { state } = useAppState();
@@ -32,12 +33,17 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 border-b border-white/[0.05] bg-ink-950/70 backdrop-blur-xl">
       <div className="flex h-14 items-center justify-between gap-4 px-4 md:px-8">
-        {/* Left: clock */}
-        <div className="flex items-center gap-4">
+        {/* Left: hamburger mobile + clock */}
+        <div className="flex items-center gap-3">
+          <MobileMenuButton />
           <div className="hidden md:block">
             <div className="font-mono text-base font-medium tabular text-slate-200">
               {mounted ? time : "--:--"}
             </div>
+          </div>
+          {/* Clock en mobile */}
+          <div className="font-mono text-sm font-medium tabular text-slate-400 md:hidden">
+            {mounted ? time : "--:--"}
           </div>
         </div>
 

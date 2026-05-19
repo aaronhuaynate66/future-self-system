@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Trash2 } from "lucide-react";
+import { Save, Trash2, CalendarCheck } from "lucide-react";
 import { useAppState } from "@/lib/state";
 import { todayIso } from "@/lib/dates";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import type { DailyLog, PeaceFlag, SleepFlag } from "@/types";
 import { cn } from "@/lib/utils";
+import { fetchCalendarEvents, eventsForDate } from "@/lib/calendar";
+import { autoDetectFromCalendar } from "@/lib/score";
 
 const EMPTY: DailyLog = {
   id: "",
@@ -103,13 +105,30 @@ function FlagPicker({
 
 export default function RegistroPage() {
   const { state, dispatch } = useAppState();
-  const [date, setDate] = useState(todayIso());
-  const [draft, setDraft] = useState<DailyLog>({ ...EMPTY, date: todayIso() });
+  const [date, setDate]     = useState(todayIso());
+  const [draft, setDraft]   = useState<DailyLog>({ ...EMPTY, date: todayIso() });
+  const [saved, setSaved]   = useState(false);
+  const [calDetected, setCalDetected] = useState<{ trained: boolean; heavyDay: boolean; lateNight: boolean } | null>(null);
 
   useEffect(() => {
     const existing = state.dailyLogs.find((l) => l.date === date);
     setDraft(existing ?? { ...EMPTY, date });
   }, [date, state.dailyLogs]);
+
+  // Auto-detectar gym desde calendario (solo hoy)
+  useEffect(() => {
+    if (date !== todayIso()) return;
+    fetchCalendarEvents().then(events => {
+      const todayEvents = eventsForDate(events, new Date());
+      const detected = autoDetectFromCalendar(todayEvents);
+      setCalDetected(detected);
+      const existing = state.dailyLogs.find((l) => l.date === date);
+      if (!existing && detected.trained) {
+        setDraft(d => ({ ...d, trained: true }));
+      }
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
 
   function update(patch: Partial<DailyLog>) {
     setDraft((d) => ({ ...d, ...patch }));
@@ -117,6 +136,8 @@ export default function RegistroPage() {
 
   function save() {
     dispatch({ type: "UPSERT_DAILY_LOG", payload: { ...draft, date } });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
   }
 
   function remove() {
@@ -138,6 +159,25 @@ export default function RegistroPage() {
           Tres minutos. Cinco campos. El sistema vive de esto.
         </p>
       </div>
+
+      {/* Banner auto-detección */}
+      {calDetected && (calDetected.trained || calDetected.heavyDay || calDetected.lateNight) && (
+        <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] px-4 py-3">
+          <CalendarCheck size={14} className="mt-0.5 shrink-0 text-cyan-400" />
+          <div className="space-y-0.5 text-xs text-slate-400">
+            {calDetected.trained   && <div><span className="text-cyan-400 mr-1">·</span>Gym detectado en tu calendario — marcado automáticamente</div>}
+            {calDetected.heavyDay  && <div><span className="text-yellow-400 mr-1">·</span>Alta carga de trabajo detectada hoy</div>}
+            {calDetected.lateNight && <div><span className="text-orange-400 mr-1">·</span>Eventos tardíos — considera registrar mal sueño</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Feedback guardado */}
+      {saved && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-4 py-3 text-sm text-emerald-400">
+          <span className="text-base">✓</span> Registro guardado — score actualizado
+        </div>
+      )}
 
       <Card title="Día" hint={existing ? "Editando" : "Nuevo"}>
         <div className="space-y-3">
