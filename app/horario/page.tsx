@@ -119,26 +119,29 @@ function CalBlock({ event, isActive }: { event: CalEvent; isActive: boolean }) {
 function ScheduleBlock({ block, isCurrent }: { block: ScheduleBlock; isCurrent: boolean }) {
   const top    = positionTop(block.start);
   const bottom = positionTop(block.end);
-  const height = Math.max(16, bottom - top - 2);
+  const height = Math.max(18, bottom - top - 2);
   const p      = ACTIVITY_PALETTE[block.kind];
 
-  // Bloques de fondo muy sutiles — no compiten con eventos reales
   return (
     <div
       className="absolute left-0 right-0 overflow-hidden"
       style={{ top, height, zIndex: 1 }}
       title={`${block.start}–${block.end} · ${block.label}`}
     >
-      {/* Solo una línea de color muy sutil en el borde izquierdo */}
+      {/* Borde izquierdo de color */}
       <div
         className="absolute left-0 top-0 bottom-0 w-[2px]"
-        style={{ background: p.color, opacity: isCurrent ? 0.25 : 0.08 }}
+        style={{ background: p.color, opacity: isCurrent ? 0.6 : 0.22 }}
       />
-      {/* Texto extremadamente sutil */}
-      {height >= 32 && (
+      {/* Texto legible pero claramente secundario */}
+      {height >= 20 && (
         <div
-          className="absolute left-3 top-1 truncate text-[9px] font-medium"
-          style={{ color: p.text, opacity: isCurrent ? 0.18 : 0.08 }}
+          className="absolute left-3 right-1 top-1 truncate font-medium"
+          style={{
+            fontSize: "10px",
+            color: p.text,
+            opacity: isCurrent ? 0.55 : 0.30,
+          }}
         >
           {block.label}
         </div>
