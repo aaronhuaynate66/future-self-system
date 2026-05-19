@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Sun, CalendarRange, ClipboardCheck, Gauge,
-  Wallet, Flame, Target, Shield, Cpu,
+  Wallet, Flame, Target, Shield, Cpu, HeartPulse,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ const OS_LINKS = [
 
 const CONTEXT_LINKS = [
   { href: "/finanzas",  label: "Finanzas",  icon: Wallet },
+  { href: "/cuerpo",    label: "Cuerpo",    icon: HeartPulse },
   { href: "/mundial",   label: "Mundial",   icon: Flame },
   { href: "/proyectos", label: "Proyectos", icon: Target },
   { href: "/reglas",    label: "Reglas",    icon: Shield },
