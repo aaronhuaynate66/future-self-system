@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Trash2, X, CheckCircle2, Loader2, Plus, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import {
   loadScans, saveScans, addScan, removeScan, calcProgress, imcColor, imcLabel,
-  aggregateSeries, periodStats, METRICS,
+  aggregateSeries, periodStats, METRICS, exportScans, importScans,
   type BodyScan, type MetricKey, type Period,
 } from "@/lib/body";
 import { Card } from "@/components/ui/Card";
@@ -282,6 +282,50 @@ function ManualEntryForm({ onAdd, onClose }: {
 }
 
 // ─────────────────────────────────────────────────────────────
+// EXPORT / IMPORT
+// ─────────────────────────────────────────────────────────────
+function ExportImport({ scans, onImport }: {
+  scans: BodyScan[];
+  onImport: (data: BodyScan[]) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const imported = importScans(ev.target?.result as string);
+      if (imported) onImport(imported);
+    };
+    reader.readAsText(file);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  return (
+    <div className="flex gap-1.5">
+      {scans.length > 0 && (
+        <button
+          onClick={() => exportScans(scans)}
+          className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-bold text-slate-500 transition-all hover:border-white/[0.15] hover:text-slate-300"
+          title="Exportar datos a JSON"
+        >
+          ↓ Export
+        </button>
+      )}
+      <button
+        onClick={() => fileRef.current?.click()}
+        className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-bold text-slate-500 transition-all hover:border-white/[0.15] hover:text-slate-300"
+        title="Importar datos desde JSON"
+      >
+        ↑ Import
+      </button>
+      <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // UPLOAD ZONE
 // ─────────────────────────────────────────────────────────────
 type ScanState = "idle" | "loading" | "done" | "error";
@@ -471,6 +515,11 @@ export default function CuerpoPage() {
             className="flex items-center gap-1.5 rounded-xl border border-cyan-400/25 bg-cyan-400/8 px-3 py-2 text-xs font-bold text-cyan-400 transition-all hover:bg-cyan-400/15">
             <Upload size={12} /> Captura
           </button>
+          <ExportImport scans={scans} onImport={(imported) => {
+            const merged = [...scans, ...imported.filter(i => !scans.find(s => s.id === i.id))];
+            const sorted = merged.sort((a,b) => b.date.localeCompare(a.date));
+            setScans(sorted); saveScans(sorted);
+          }} />
         </div>
       </div>
 

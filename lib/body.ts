@@ -242,3 +242,24 @@ export function periodStats(points: AggPoint[]): PeriodStats | null {
     deltaPct: Math.round((delta / first) * 1000) / 10,
     max, min, avg, count: points.length };
 }
+
+// ── Export / Import ───────────────────────────────────────────
+
+export function exportScans(scans: BodyScan[]): void {
+  const json = JSON.stringify(scans, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `aaron-body-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function importScans(json: string): BodyScan[] | null {
+  try {
+    const data = JSON.parse(json);
+    if (!Array.isArray(data)) return null;
+    return data as BodyScan[];
+  } catch { return null; }
+}
