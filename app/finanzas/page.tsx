@@ -15,6 +15,7 @@ import type {
   FinancialOS, Transaction, FinanceCategory, TransactionType, SpendingIntent,
 } from "@/types";
 import { Card } from "@/components/ui/Card";
+import { dbLoadTransactions, dbSaveTransaction, dbDeleteTransaction } from "@/lib/db";
 import { Button } from "@/components/ui/Button";
 
 // ────────────────────────────────────────────────────────────
@@ -327,22 +328,37 @@ export default function FinancialOSPage() {
   const month = currentMonth();
 
   useEffect(() => {
-    setData(loadFinancialOS());
-    setMounted(true);
+    // Cargar desde Supabase, fallback a localStorage
+    dbLoadTransactions().then(remote => {
+      if (remote.length > 0) {
+        const updated = { ...loadFinancialOS(), transactions: remote };
+        setData(updated);
+        saveFinancialOS(updated);
+      } else {
+        setData(loadFinancialOS());
+      }
+      setMounted(true);
+    }).catch(() => {
+      setData(loadFinancialOS());
+      setMounted(true);
+    });
   }, []);
 
   const summary = useMemo(() => summarizeMonth(data, month), [data, month]);
 
   function handleAdd(tx: Omit<Transaction, "id">) {
     const updated = addTransaction(data, tx);
+    const newTx = updated.transactions[0];
     setData(updated);
     saveFinancialOS(updated);
+    dbSaveTransaction(newTx).catch(console.error);
   }
 
   function handleRemove(id: string) {
     const updated = removeTransaction(data, id);
     setData(updated);
     saveFinancialOS(updated);
+    dbDeleteTransaction(id).catch(console.error);
   }
 
   const recentTxs = data.transactions

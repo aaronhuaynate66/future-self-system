@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.3.8",
     "ical.js": "^2.2.1",

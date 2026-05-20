@@ -9,6 +9,7 @@ import {
   type BodyScan, type MetricKey, type Period,
 } from "@/lib/body";
 import { Card } from "@/components/ui/Card";
+import { dbLoadBodyScans, dbSaveBodyScan, dbDeleteBodyScan } from "@/lib/db";
 
 // ─────────────────────────────────────────────────────────────
 // CHART SVG
@@ -497,19 +498,42 @@ export default function CuerpoPage() {
   const [showManual, setShowManual] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  useEffect(() => { setScans(loadScans()); setMounted(true); }, []);
+  useEffect(() => {
+    // Cargar desde Supabase primero, fallback a localStorage
+    dbLoadBodyScans().then(remote => {
+      if (remote.length > 0) {
+        setScans(remote);
+        saveScans(remote); // sincronizar localStorage
+      } else {
+        setScans(loadScans());
+      }
+      setMounted(true);
+    }).catch(() => {
+      setScans(loadScans());
+      setMounted(true);
+    });
+  }, []);
 
   function handleScanned(data: Omit<BodyScan, "id">) {
     const updated = addScan(scans, data);
-    setScans(updated); saveScans(updated); setShowAdd(false);
+    const newScan = updated[0];
+    setScans(updated);
+    saveScans(updated);
+    setShowAdd(false);
+    dbSaveBodyScan(newScan).catch(console.error);
   }
   function handleManual(data: Omit<BodyScan, "id">) {
     const updated = addScan(scans, data);
-    setScans(updated); saveScans(updated);
+    const newScan = updated.find(s => !scans.find(e => e.id === s.id));
+    setScans(updated);
+    saveScans(updated);
+    if (newScan) dbSaveBodyScan(newScan).catch(console.error);
   }
   function handleRemove(id: string) {
     const updated = removeScan(scans, id);
-    setScans(updated); saveScans(updated);
+    setScans(updated);
+    saveScans(updated);
+    dbDeleteBodyScan(id).catch(console.error);
   }
 
   if (!mounted) return null;

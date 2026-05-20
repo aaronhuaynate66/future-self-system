@@ -1,5 +1,6 @@
 "use client";
 
+import { dbSaveDailyLog, dbDeleteDailyLog, dbLoadDailyLogs } from "@/lib/db";
 import {
   createContext,
   useContext,
@@ -125,14 +126,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Cargar desde localStorage primero (rápido)
       const data = await storage.load();
       const today = todayIso();
-      const top3 =
-        data.top3.date === today ? data.top3 : { date: today, tasks: [] };
+      const top3 = data.top3.date === today ? data.top3 : { date: today, tasks: [] };
       if (!cancelled) {
         dispatch({ type: "HYDRATE", payload: { ...data, top3 } });
         hydratedRef.current = true;
       }
+      // Luego sincronizar desde Supabase (permanente)
+      dbLoadDailyLogs().then(remoteLogs => {
+        if (cancelled || remoteLogs.length === 0) return;
+        dispatch({ type: "HYDRATE", payload: { ...data, top3, dailyLogs: remoteLogs } });
+      }).catch(() => {});
     })();
     return () => { cancelled = true; };
   }, []);

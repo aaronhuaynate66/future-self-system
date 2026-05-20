@@ -10,6 +10,7 @@ import type { DailyLog, PeaceFlag, SleepFlag } from "@/types";
 import { cn } from "@/lib/utils";
 import { fetchCalendarEvents, eventsForDate } from "@/lib/calendar";
 import { autoDetectFromCalendar } from "@/lib/score";
+import { dbSaveDailyLog, dbDeleteDailyLog } from "@/lib/db";
 
 const EMPTY: DailyLog = {
   id: "",
@@ -137,14 +138,20 @@ export default function RegistroPage() {
   }
 
   function save() {
-    dispatch({ type: "UPSERT_DAILY_LOG", payload: { ...draft, date } });
+    const payload = { ...draft, date };
+    dispatch({ type: "UPSERT_DAILY_LOG", payload });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+    // Sincronizar a Supabase (fire & forget)
+    const existing = state.dailyLogs.find(l => l.date === date);
+    const id = existing?.id ?? `log-${date}`;
+    dbSaveDailyLog({ ...payload, id }).catch(console.error);
   }
 
   function remove() {
     if (!draft.id) return;
     dispatch({ type: "REMOVE_DAILY_LOG", payload: { id: draft.id } });
+    dbDeleteDailyLog(draft.id).catch(console.error);
     setDraft({ ...EMPTY, date });
   }
 
