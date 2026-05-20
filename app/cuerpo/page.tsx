@@ -2,181 +2,197 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Upload, Trash2, X, CheckCircle2, Loader2, Plus, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import {
-  Upload, Trash2, TrendingDown, TrendingUp,
-  Scale, Activity, Droplets, Zap, X, CheckCircle2, Loader2, ChevronDown, ChevronUp,
-} from "lucide-react";
-import {
-  loadScans, saveScans, addScan, removeScan,
-  calcProgress, chartSeries, imcColor, imcLabel,
-  type BodyScan, type ChartMetric,
+  loadScans, saveScans, addScan, removeScan, calcProgress, imcColor, imcLabel,
+  aggregateSeries, periodStats, METRICS,
+  type BodyScan, type MetricKey, type Period,
 } from "@/lib/body";
 import { Card } from "@/components/ui/Card";
 
 // ─────────────────────────────────────────────────────────────
-// MINI LINE CHART
+// CHART SVG
 // ─────────────────────────────────────────────────────────────
-function MiniChart({
-  data, color, label, unit,
+function BodyChart({
+  data, color, unit, goodDown, height = 120,
 }: {
-  data: { date: string; value: number }[];
-  color: string; label: string; unit: string;
+  data: { label: string; value: number }[];
+  color: string; unit: string; goodDown: boolean; height?: number;
 }) {
-  const W = 280, H = 72, PAD = 6;
+  if (data.length === 0) return (
+    <div className="flex items-center justify-center py-8 text-xs text-slate-700">Sin datos para este período</div>
+  );
+
+  const W = 600, H = height, PAD = { t: 12, b: 28, l: 8, r: 8 };
   const vals  = data.map(d => d.value);
-  const min   = Math.min(...vals) * 0.995;
-  const max   = Math.max(...vals) * 1.005;
+  const min   = Math.min(...vals) * (goodDown ? 0.998 : 0.995);
+  const max   = Math.max(...vals) * (goodDown ? 1.002 : 1.005);
   const range = Math.max(0.01, max - min);
+  const iW    = W - PAD.l - PAD.r;
+  const iH    = H - PAD.t - PAD.b;
 
-  const toX = (i: number) => PAD + (i / Math.max(1, data.length - 1)) * (W - PAD * 2);
-  const toY = (v: number) => H - PAD - ((v - min) / range) * (H - PAD * 2);
+  const toX = (i: number) => PAD.l + (i / Math.max(1, data.length - 1)) * iW;
+  const toY = (v: number) => PAD.t + (1 - (v - min) / range) * iH;
 
-  const pts    = data.map((d, i) => `${toX(i)},${toY(d.value)}`);
-  const latest = vals[vals.length - 1];
-  const first  = vals[0];
-  const delta  = latest - first;
-  const isGood = label === "Peso" || label === "Grasa corporal" ? delta <= 0 : delta >= 0;
+  const pts   = data.map((d, i) => `${toX(i)},${toY(d.value)}`);
+  const first = vals[0], last = vals[vals.length - 1];
+  const delta = last - first;
+  const isGood = goodDown ? delta <= 0 : delta >= 0;
+  const deltaColor = delta === 0 ? "#64748b" : isGood ? "#22d3a5" : "#f43f5e";
+
+  // Show every Nth label to avoid clutter
+  const maxLabels = 8;
+  const step = Math.ceil(data.length / maxLabels);
+
+  return (
+    <div>
+      {/* Delta summary */}
+      {data.length >= 2 && (
+        <div className="mb-3 flex items-baseline gap-3">
+          <span className="text-2xl font-black tabular-nums" style={{ color }}>
+            {last.toFixed(1)}<span className="text-sm font-normal text-slate-600 ml-0.5">{unit}</span>
+          </span>
+          <span className="text-sm font-bold" style={{ color: deltaColor }}>
+            {delta > 0 ? "+" : ""}{delta.toFixed(1)}{unit}
+          </span>
+          <span className="text-xs text-slate-600">vs inicio del período</span>
+        </div>
+      )}
+      {data.length === 1 && (
+        <div className="mb-3">
+          <span className="text-2xl font-black tabular-nums" style={{ color }}>
+            {last.toFixed(1)}<span className="text-sm font-normal text-slate-600 ml-0.5">{unit}</span>
+          </span>
+        </div>
+      )}
+
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height }} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`bg-${color.slice(1)}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Horizontal grid */}
+        {[0, 0.25, 0.5, 0.75, 1].map(f => {
+          const y = PAD.t + f * iH;
+          const v = max - f * range;
+          return (
+            <g key={f}>
+              <line x1={PAD.l} y1={y} x2={W - PAD.r} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+              {f !== 1 && (
+                <text x={W - PAD.r + 2} y={y + 4} fontSize="9" fill="rgba(255,255,255,0.2)" textAnchor="start">
+                  {v.toFixed(1)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Area fill */}
+        {data.length >= 2 && (
+          <polygon
+            points={`${toX(0)},${H - PAD.b} ${pts.join(" ")} ${toX(data.length - 1)},${H - PAD.b}`}
+            fill={`url(#bg-${color.slice(1)})`}
+          />
+        )}
+
+        {/* Line */}
+        {data.length >= 2 && (
+          <polyline points={pts.join(" ")} fill="none" stroke={color}
+            strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        )}
+
+        {/* Dots */}
+        {data.map((d, i) => {
+          const isLast = i === data.length - 1;
+          return (
+            <circle key={i} cx={toX(i)} cy={toY(d.value)} r={isLast ? 4 : 2.5}
+              fill={isLast ? color : `${color}aa`}
+              style={{ filter: isLast ? `drop-shadow(0 0 5px ${color})` : "none" }}
+            />
+          );
+        })}
+
+        {/* X labels */}
+        {data.map((d, i) => {
+          if (i % step !== 0 && i !== data.length - 1) return null;
+          return (
+            <text key={i} x={toX(i)} y={H - 4} fontSize="9" fill="rgba(255,255,255,0.3)"
+              textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}>
+              {d.label}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// METRIC CARD (individual con período selector)
+// ─────────────────────────────────────────────────────────────
+function MetricCard({
+  metricKey, label, unit, color, goodDown, scans, period,
+}: {
+  metricKey: MetricKey; label: string; unit: string; color: string;
+  goodDown: boolean; scans: BodyScan[]; period: Period;
+}) {
+  const points = useMemo(() => aggregateSeries(scans, metricKey, period), [scans, metricKey, period]);
+  const stats  = useMemo(() => periodStats(points), [points]);
 
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{label}</span>
-        {data.length >= 2 && (
-          <span className="text-[11px] font-bold" style={{ color: isGood ? "#22d3a5" : "#f43f5e" }}>
-            {delta > 0 ? "+" : ""}{delta.toFixed(1)}{unit}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full" style={{ background: color }} />
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{label}</span>
+        </div>
+        {stats && (
+          <div className="flex gap-3 text-[10px] text-slate-600">
+            <span>↑ {stats.max.toFixed(1)}</span>
+            <span>↓ {stats.min.toFixed(1)}</span>
+            <span>⌀ {stats.avg.toFixed(1)}{unit}</span>
+          </div>
         )}
       </div>
-
-      <div className="flex items-end gap-4">
-        {/* Valor actual grande */}
-        <div>
-          <div className="text-3xl font-black tabular-nums leading-none" style={{ color }}>
-            {latest.toFixed(1)}
-          </div>
-          <div className="mt-0.5 text-[10px] text-slate-600">{unit}</div>
-        </div>
-
-        {/* Gráfico */}
-        <div className="flex-1">
-          {data.length >= 2 ? (
-            <svg viewBox={`0 0 ${W} ${H}`} style={{ height: 52, width: "100%" }} preserveAspectRatio="none">
-              <defs>
-                <linearGradient id={`g-${label}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity="0.20" />
-                  <stop offset="100%" stopColor={color} stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              {/* Grid lines */}
-              {[0.25, 0.5, 0.75].map(f => (
-                <line key={f} x1={PAD} y1={PAD + f * (H - PAD * 2)} x2={W - PAD} y2={PAD + f * (H - PAD * 2)}
-                  stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-              ))}
-              {/* Area */}
-              <polygon
-                points={`${toX(0)},${H} ${pts.join(" ")} ${toX(data.length - 1)},${H}`}
-                fill={`url(#g-${label})`}
-              />
-              {/* Line */}
-              <polyline points={pts.join(" ")} fill="none" stroke={color}
-                strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-              {/* Dots */}
-              {data.map((_, i) => (
-                <circle key={i} cx={toX(i)} cy={toY(_.value)} r="2.5" fill={color}
-                  style={{ filter: i === data.length - 1 ? `drop-shadow(0 0 4px ${color})` : "none" }} />
-              ))}
-            </svg>
-          ) : (
-            <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-white/[0.06]">
-              <span className="text-[10px] text-slate-700">2+ mediciones para ver evolución</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Fechas */}
-      {data.length >= 2 && (
-        <div className="mt-2 flex justify-between text-[9px] text-slate-700">
-          <span>{data[0].date}</span>
-          <span>{data[data.length - 1].date}</span>
-        </div>
-      )}
+      <BodyChart data={points} color={color} unit={unit} goodDown={goodDown} height={110} />
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// PROGRESS TOWARD GOAL
+// PROGRESS BAR
 // ─────────────────────────────────────────────────────────────
-function GoalProgress({ scans }: { scans: BodyScan[] }) {
-  const progress = useMemo(() => calcProgress(scans), [scans]);
-  if (!progress) return null;
-
-  const { pesoInicial, pesoActual, pesoObjetivo, perdido, faltante, porcentajeCompletado } = progress;
-  const imcCol = imcColor(scans[0]?.imc ?? null);
+function GoalBar({ scans }: { scans: BodyScan[] }) {
+  const p = useMemo(() => calcProgress(scans), [scans]);
+  if (!p) return null;
+  const { pesoInicial, pesoActual, pesoObjetivo, perdido, faltante, porcentajeCompletado } = p;
 
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <div className="mb-4 text-[11px] uppercase tracking-widest text-slate-500">Objetivo de peso</div>
-
-      {/* Barra de progreso horizontal */}
-      <div className="mb-4">
-        <div className="mb-2 flex justify-between text-xs text-slate-500">
-          <span>Inicial: <span className="text-slate-300 font-mono">{pesoInicial.toFixed(1)} kg</span></span>
-          <span>Objetivo: <span className="text-emerald-400 font-mono">{pesoObjetivo.toFixed(1)} kg</span></span>
-        </div>
-        <div className="relative h-3 w-full overflow-hidden rounded-full bg-white/[0.05]">
-          <motion.div
-            className="h-full rounded-full"
-            style={{ background: "linear-gradient(90deg, #22d3a5, #22e6ff)" }}
-            initial={{ width: 0 }}
-            animate={{ width: `${porcentajeCompletado}%` }}
-            transition={{ duration: 1, ease: "easeOut" }}
-          />
-          {/* Marcador actual */}
-          <motion.div
-            className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-400"
-            style={{ boxShadow: "0 0 8px rgba(34,230,255,0.6)" }}
-            initial={{ left: 0 }}
-            animate={{ left: `${porcentajeCompletado}%` }}
-            transition={{ duration: 1, ease: "easeOut" }}
-          />
-        </div>
-        <div className="mt-1 text-center text-[10px] text-slate-600">
-          Actual: <span className="font-mono font-bold text-white">{pesoActual.toFixed(1)} kg</span>
-        </div>
+      <div className="mb-3 text-[11px] uppercase tracking-widest text-slate-500">Objetivo de peso</div>
+      <div className="mb-1 flex justify-between text-xs text-slate-500">
+        <span>Inicial <span className="font-mono text-slate-300">{pesoInicial.toFixed(1)} kg</span></span>
+        <span>Actual <span className="font-mono font-bold text-white">{pesoActual.toFixed(1)} kg</span></span>
+        <span>Meta <span className="font-mono text-emerald-400">{pesoObjetivo.toFixed(1)} kg</span></span>
       </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 text-center">
-        <div className="rounded-xl bg-white/[0.03] p-2">
-          <div className="text-[10px] uppercase tracking-widest text-slate-600">Perdido</div>
-          <div className="mt-1 font-mono text-lg font-black text-emerald-400">
-            {perdido > 0 ? `-${perdido.toFixed(1)}` : "0"} kg
-          </div>
-        </div>
-        <div className="rounded-xl bg-white/[0.03] p-2">
-          <div className="text-[10px] uppercase tracking-widest text-slate-600">Progreso</div>
-          <div className="mt-1 font-mono text-lg font-black text-cyan-400">
-            {porcentajeCompletado.toFixed(0)}%
-          </div>
-        </div>
-        <div className="rounded-xl bg-white/[0.03] p-2">
-          <div className="text-[10px] uppercase tracking-widest text-slate-600">Falta</div>
-          <div className="mt-1 font-mono text-lg font-black text-slate-400">
-            {faltante > 0 ? `${faltante.toFixed(1)}` : "✓"} {faltante > 0 ? "kg" : ""}
-          </div>
-        </div>
+      <div className="relative h-3 w-full overflow-hidden rounded-full bg-white/[0.05]">
+        <motion.div className="h-full rounded-full"
+          style={{ background: "linear-gradient(90deg,#22d3a5,#22e6ff)" }}
+          initial={{ width: 0 }} animate={{ width: `${porcentajeCompletado}%` }}
+          transition={{ duration: 1, ease: "easeOut" }} />
       </div>
-
-      {/* IMC */}
+      <div className="mt-2 flex justify-between text-[10px]">
+        <span className="text-emerald-400">▼ {perdido.toFixed(1)} kg perdidos · {porcentajeCompletado.toFixed(0)}%</span>
+        <span className="text-slate-600">Faltan {faltante.toFixed(1)} kg</span>
+      </div>
       {scans[0]?.imc && (
-        <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/[0.04] px-3 py-2">
-          <div className="h-2 w-2 rounded-full" style={{ background: imcCol }} />
-          <span className="text-xs text-slate-400">
-            IMC <span className="font-mono font-bold text-slate-200">{scans[0].imc}</span>
-            {" — "}<span style={{ color: imcCol }}>{imcLabel(scans[0].imc)}</span>
-          </span>
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <div className="h-1.5 w-1.5 rounded-full" style={{ background: imcColor(scans[0].imc) }} />
+          <span className="text-slate-500">IMC <span className="font-mono text-slate-300">{scans[0].imc}</span>
+            {" — "}<span style={{ color: imcColor(scans[0].imc) }}>{imcLabel(scans[0].imc)}</span></span>
         </div>
       )}
     </div>
@@ -184,61 +200,84 @@ function GoalProgress({ scans }: { scans: BodyScan[] }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// STAT GRID (última medición)
+// MANUAL ENTRY FORM
 // ─────────────────────────────────────────────────────────────
-const STATS_CONFIG = [
-  { key: "peso_kg" as const,                     label: "Peso",            unit: "kg",   color: "#22e6ff", icon: Scale },
-  { key: "grasa_corporal_pct" as const,          label: "Grasa corporal",  unit: "%",    color: "#f59e0b", icon: TrendingDown },
-  { key: "masa_musculoesqueletica_kg" as const,  label: "Masa muscular",   unit: "kg",   color: "#22d3a5", icon: TrendingUp },
-  { key: "agua_corporal_pct" as const,           label: "Agua corporal",   unit: "%",    color: "#60a5fa", icon: Droplets },
-  { key: "grasa_visceral_nivel" as const,        label: "Grasa visceral",  unit: " niv", color: "#f43f5e", icon: Activity },
-  { key: "tasa_metabolica_basal_kcal" as const,  label: "TMB",             unit: " kcal",color: "#a78bfa", icon: Zap },
-  { key: "masa_libre_grasa_kg" as const,         label: "Masa sin grasa",  unit: "kg",   color: "#34d399", icon: TrendingUp },
-  { key: "masa_osea_kg" as const,                label: "Masa ósea",       unit: "kg",   color: "#94a3b8", icon: Activity },
-  { key: "proteinas_pct" as const,               label: "Proteínas",       unit: "%",    color: "#c084fc", icon: TrendingUp },
-];
+function ManualEntryForm({ onAdd, onClose }: {
+  onAdd: (data: Omit<BodyScan, "id">) => void;
+  onClose: () => void;
+}) {
+  const [date, setDate]   = useState(new Date().toISOString().slice(0, 10));
+  const [peso, setPeso]   = useState("");
+  const [grasa, setGrasa] = useState("");
+  const [musculo, setMusculo] = useState("");
+  const [agua, setAgua]   = useState("");
+  const [imc, setImc]     = useState("");
+  const [visceral, setVisceral] = useState("");
 
-const CHART_METRICS: { key: ChartMetric; label: string; unit: string; color: string }[] = [
-  { key: "peso_kg",                    label: "Peso",           unit: "kg", color: "#22e6ff" },
-  { key: "grasa_corporal_pct",         label: "Grasa corporal", unit: "%",  color: "#f59e0b" },
-  { key: "masa_musculoesqueletica_kg", label: "Masa muscular",  unit: "kg", color: "#22d3a5" },
-  { key: "agua_corporal_pct",          label: "Agua corporal",  unit: "%",  color: "#60a5fa" },
-];
+  function handleSubmit() {
+    if (!peso) return;
+    onAdd({
+      date,
+      peso_kg: parseFloat(peso) || null,
+      imc: parseFloat(imc) || null,
+      clasificacion_imc: null,
+      grasa_corporal_pct: parseFloat(grasa) || null,
+      masa_libre_grasa_kg: null,
+      agua_corporal_pct: parseFloat(agua) || null,
+      grasa_visceral_nivel: parseFloat(visceral) || null,
+      masa_osea_kg: null,
+      proteinas_pct: null,
+      masa_musculoesqueletica_kg: parseFloat(musculo) || null,
+      tasa_metabolica_basal_kcal: null,
+      frecuencia_cardiaca_ppm: null,
+      peso_objetivo_kg: 70.4,
+      peso_inicial_kg: 84.3,
+      total_perdido_kg: null,
+      source: "manual",
+    });
+    onClose();
+  }
 
-function StatGrid({ scan, prev }: { scan: BodyScan; prev: BodyScan | null }) {
+  const inputClass = "w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-slate-700 focus:border-cyan-400/40 focus:outline-none";
+
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {STATS_CONFIG.map(({ key, label, unit, color, icon: Icon }) => {
-        const val  = scan[key];
-        const pval = prev?.[key];
-        if (val === null || val === undefined) return null;
-        const delta = (pval !== null && pval !== undefined) ? (val as number) - (pval as number) : null;
-        const isGood = key === "peso_kg" || key === "grasa_corporal_pct" || key === "grasa_visceral_nivel"
-          ? (delta ?? 0) <= 0
-          : (delta ?? 0) >= 0;
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
+      <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+        className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#0d1825] p-6 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between">
+          <div className="text-sm font-bold uppercase tracking-widest text-slate-300">Entrada manual</div>
+          <button onClick={onClose} className="text-slate-600 hover:text-slate-300"><X size={18} /></button>
+        </div>
 
-        return (
-          <div key={key} className="flex items-center gap-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-3">
-            <div className="rounded-lg p-1.5 shrink-0" style={{ background: `${color}18` }}>
-              <Icon size={13} style={{ color }} />
+        <div className="mb-4">
+          <label className="mb-1 block text-[10px] uppercase tracking-widest text-slate-600">Fecha</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          {[
+            { label: "Peso (kg) *", val: peso, set: setPeso, placeholder: "82.2" },
+            { label: "IMC",         val: imc,  set: setImc,  placeholder: "26.5" },
+            { label: "Grasa (%)",   val: grasa, set: setGrasa, placeholder: "25.5" },
+            { label: "Músculo (kg)",val: musculo, set: setMusculo, placeholder: "33.3" },
+            { label: "Agua (%)",    val: agua, set: setAgua, placeholder: "49.2" },
+            { label: "Visceral niv",val: visceral, set: setVisceral, placeholder: "11" },
+          ].map(({ label, val, set, placeholder }) => (
+            <div key={label}>
+              <label className="mb-1 block text-[10px] uppercase tracking-widest text-slate-600">{label}</label>
+              <input type="number" step="0.1" value={val} onChange={e => set(e.target.value)}
+                placeholder={placeholder} className={inputClass} />
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-widest text-slate-600 truncate">{label}</div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-mono text-sm font-bold" style={{ color }}>
-                  {(val as number).toFixed(1)}<span className="text-[9px] font-normal text-slate-600 ml-0.5">{unit}</span>
-                </span>
-                {delta !== null && Math.abs(delta) > 0.05 && (
-                  <span className="text-[9px] font-bold" style={{ color: isGood ? "#22d3a5" : "#f43f5e" }}>
-                    {delta > 0 ? "+" : ""}{delta.toFixed(1)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          ))}
+        </div>
+
+        <button onClick={handleSubmit} disabled={!peso}
+          className="w-full rounded-2xl border border-cyan-400/30 bg-cyan-400/10 py-3 text-sm font-bold text-cyan-300 transition-all hover:bg-cyan-400/20 disabled:opacity-30">
+          Guardar medición
+        </button>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -255,45 +294,37 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
   const [extracted, setExtracted] = useState<Record<string, number | string | null> | null>(null);
 
   const processFile = useCallback(async (file: File) => {
-    setState("loading");
-    setErrMsg(""); setExtracted(null);
+    setState("loading"); setErrMsg(""); setExtracted(null);
     const reader = new FileReader();
     reader.onload = e => setPreview(e.target?.result as string);
     reader.readAsDataURL(file);
-
     const b64 = await new Promise<string>((res, rej) => {
       const r = new FileReader();
       r.onload  = () => res((r.result as string).split(",")[1]);
       r.onerror = () => rej(new Error("Read failed"));
       r.readAsDataURL(file);
     });
-
     const resp = await fetch("/api/body-scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imageBase64: b64, mediaType: file.type || "image/jpeg" }),
     });
     if (!resp.ok) { setErrMsg((await resp.json()).error ?? "Error"); setState("error"); return; }
-    const result = await resp.json();
-    setExtracted(result.data);
+    setExtracted((await resp.json()).data);
     setState("done");
   }, []);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    const f = e.target.files?.[0]; if (f) processFile(f);
   }
   function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
+    e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) processFile(f);
   }
   function handleConfirm() {
     if (!extracted) return;
     const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+    const ds = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
     onScanned({
-      date: (extracted.fecha_medicion as string) ?? dateStr,
+      date: (extracted.fecha_medicion as string) ?? ds,
       peso_kg: extracted.peso_kg as number ?? null,
       imc: extracted.imc as number ?? null,
       clasificacion_imc: extracted.clasificacion_imc as string ?? null,
@@ -306,73 +337,55 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
       masa_musculoesqueletica_kg: extracted.masa_musculoesqueletica_kg as number ?? null,
       tasa_metabolica_basal_kcal: extracted.tasa_metabolica_basal_kcal as number ?? null,
       frecuencia_cardiaca_ppm: extracted.frecuencia_cardiaca_ppm as number ?? null,
-      peso_objetivo_kg: extracted.peso_objetivo_kg as number ?? null,
-      peso_inicial_kg: extracted.peso_inicial_kg as number ?? null,
-      total_perdido_kg: extracted.total_perdido_kg as number ?? null,
+      peso_objetivo_kg: 70.4,
+      peso_inicial_kg: 84.3,
+      total_perdido_kg: null,
+      source: "scan",
     });
     setState("idle"); setPreview(null); setExtracted(null);
     if (inputRef.current) inputRef.current.value = "";
   }
-  function handleReset() {
+  function reset() {
     setState("idle"); setPreview(null); setExtracted(null); setErrMsg("");
     if (inputRef.current) inputRef.current.value = "";
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {state === "idle" && (
         <div onDrop={handleDrop} onDragOver={e => e.preventDefault()} onClick={() => inputRef.current?.click()}
-          className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-white/[0.10] bg-white/[0.02] py-8 transition-all hover:border-cyan-400/40 hover:bg-cyan-400/[0.03]"
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04]">
-            <Upload size={18} className="text-slate-400" />
-          </div>
-          <div className="text-center">
-            <div className="text-sm font-medium text-slate-300">Sube captura de tu báscula</div>
-            <div className="mt-0.5 text-xs text-slate-600">JPG · PNG · arrastra o haz click</div>
-          </div>
+          className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-white/[0.08] bg-white/[0.01] py-6 transition-all hover:border-cyan-400/40">
+          <Upload size={16} className="text-slate-500" />
+          <div className="text-xs text-slate-500">Subir captura de báscula · Claude extrae todo automáticamente</div>
           <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
         </div>
       )}
-
       {state === "loading" && (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/[0.06] py-10">
-          {preview && <img src={preview} alt="preview" className="h-28 w-auto rounded-xl opacity-40" />}
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Loader2 size={15} className="animate-spin text-cyan-400" />
-            Claude Vision analizando…
-          </div>
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/[0.06] py-6 text-xs text-slate-500">
+          <Loader2 size={14} className="animate-spin text-cyan-400" /> Claude Vision analizando…
         </div>
       )}
-
       {state === "error" && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-5 text-center">
-          <div className="text-sm text-red-400">{errMsg}</div>
-          <button onClick={handleReset} className="mt-3 text-xs text-slate-500 underline">Intentar de nuevo</button>
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-4 text-center text-xs text-red-400">
+          {errMsg} <button onClick={reset} className="ml-2 underline text-slate-500">Reintentar</button>
         </div>
       )}
-
       {state === "done" && extracted && (
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.04] p-5"
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-400">
-              <CheckCircle2 size={15} /> Datos extraídos
-            </div>
-            <button onClick={handleReset} className="text-slate-600 hover:text-slate-400"><X size={15} /></button>
+        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.04] p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400"><CheckCircle2 size={13} /> Datos extraídos</div>
+            <button onClick={reset}><X size={14} className="text-slate-600" /></button>
           </div>
-          <div className="flex gap-4">
-            {preview && <img src={preview} alt="scan" className="h-28 w-auto shrink-0 rounded-xl object-cover" />}
-            <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-1.5">
+          <div className="flex gap-3">
+            {preview && <img src={preview} alt="scan" className="h-20 w-auto shrink-0 rounded-lg object-cover" />}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 flex-1">
               {[
-                { k: "Peso",    v: extracted.peso_kg,                    u: "kg"   },
-                { k: "IMC",     v: extracted.imc,                        u: ""     },
-                { k: "Grasa",   v: extracted.grasa_corporal_pct,         u: "%"    },
-                { k: "Músculo", v: extracted.masa_musculoesqueletica_kg, u: "kg"   },
-                { k: "Agua",    v: extracted.agua_corporal_pct,          u: "%"    },
-                { k: "TMB",     v: extracted.tasa_metabolica_basal_kcal, u: " kcal"},
-              ].filter(({ v }) => v !== null && v !== undefined).map(({ k, v, u }) => (
+                { k: "Peso", v: extracted.peso_kg, u: "kg" },
+                { k: "IMC",  v: extracted.imc, u: "" },
+                { k: "Grasa", v: extracted.grasa_corporal_pct, u: "%" },
+                { k: "Músculo", v: extracted.masa_musculoesqueletica_kg, u: "kg" },
+              ].filter(({ v }) => v != null).map(({ k, v, u }) => (
                 <div key={k} className="flex items-baseline gap-1">
                   <span className="text-[10px] text-slate-500">{k}:</span>
                   <span className="font-mono text-sm font-bold text-white">{v as number}{u}</span>
@@ -381,8 +394,7 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
             </div>
           </div>
           <button onClick={handleConfirm}
-            className="mt-4 w-full rounded-xl border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-sm font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all"
-          >
+            className="mt-3 w-full rounded-xl border border-emerald-500/25 bg-emerald-500/8 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/15 transition-all">
             Guardar en historial
           </button>
         </motion.div>
@@ -392,170 +404,219 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
 }
 
 // ─────────────────────────────────────────────────────────────
-// HISTORIAL ITEM
+// PERIOD TABS
 // ─────────────────────────────────────────────────────────────
-function HistorialItem({ scan, prev, onRemove, isLatest }: {
-  scan: BodyScan; prev: BodyScan | null; onRemove: () => void; isLatest: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const imcCol = imcColor(scan.imc);
-
-  return (
-    <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3">
-        {isLatest && (
-          <span className="shrink-0 rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-cyan-400">
-            último
-          </span>
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-            {scan.peso_kg && (
-              <span className="font-mono text-base font-black text-white">{scan.peso_kg} kg</span>
-            )}
-            {scan.grasa_corporal_pct && (
-              <span className="text-xs text-slate-500">Grasa <span className="text-slate-300">{scan.grasa_corporal_pct}%</span></span>
-            )}
-            {scan.imc && (
-              <span className="text-xs font-semibold" style={{ color: imcCol }}>IMC {scan.imc}</span>
-            )}
-            {scan.masa_musculoesqueletica_kg && (
-              <span className="text-xs text-slate-500">Músculo <span className="text-slate-300">{scan.masa_musculoesqueletica_kg}kg</span></span>
-            )}
-          </div>
-          <div className="text-[10px] text-slate-600 mt-0.5">{scan.date}</div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => setExpanded(e => !e)} className="text-slate-700 hover:text-slate-400 transition-colors">
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-          <button onClick={onRemove} className="text-slate-700 hover:text-red-400 transition-colors">
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </div>
-      {expanded && (
-        <div className="border-t border-white/[0.04] px-4 pb-4 pt-3">
-          <StatGrid scan={scan} prev={prev} />
-        </div>
-      )}
-    </div>
-  );
-}
+const PERIODS: { key: Period; label: string }[] = [
+  { key: "week",  label: "Semana"  },
+  { key: "month", label: "Mes"     },
+  { key: "year",  label: "Año"     },
+  { key: "all",   label: "Todo"    },
+];
 
 // ─────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────
 export default function CuerpoPage() {
-  const [scans, setScans]     = useState<BodyScan[]>([]);
-  const [mounted, setMounted] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
+  const [scans, setScans]       = useState<BodyScan[]>([]);
+  const [mounted, setMounted]   = useState(false);
+  const [period, setPeriod]     = useState<Period>("month");
+  const [showAdd, setShowAdd]   = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [activeMetric, setActiveMetric] = useState<MetricKey>("peso_kg");
 
   useEffect(() => { setScans(loadScans()); setMounted(true); }, []);
 
   function handleScanned(data: Omit<BodyScan, "id">) {
     const updated = addScan(scans, data);
-    setScans(updated);
-    saveScans(updated);
-    setShowUpload(false);
+    setScans(updated); saveScans(updated); setShowAdd(false);
+  }
+  function handleManual(data: Omit<BodyScan, "id">) {
+    const updated = addScan(scans, data);
+    setScans(updated); saveScans(updated);
   }
   function handleRemove(id: string) {
     const updated = removeScan(scans, id);
-    setScans(updated);
-    saveScans(updated);
+    setScans(updated); saveScans(updated);
   }
 
   if (!mounted) return null;
 
-  const latest = scans[0] ?? null;
   const hasData = scans.length > 0;
+  const latest  = scans[0] ?? null;
+
+  // Métricas con datos
+  const availableMetrics = METRICS.filter(m =>
+    scans.some(s => s[m.key] !== null && s[m.key] !== undefined)
+  );
+
+  const activeMeta = METRICS.find(m => m.key === activeMetric) ?? METRICS[0];
+  const activePoints = aggregateSeries(scans, activeMetric, period);
+  const activeStats  = periodStats(activePoints);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
+    <div className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6">
 
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-white">Body OS</h1>
           <p className="mt-0.5 text-sm text-slate-500">
-            {hasData ? `${scans.length} medición${scans.length > 1 ? "es" : ""} · última: ${latest?.date}` : "Sin mediciones aún"}
+            {hasData ? `${scans.length} medición${scans.length > 1 ? "es" : ""}` : "Sin mediciones"}
+            {latest && ` · última ${latest.date}`}
           </p>
         </div>
-        <button
-          onClick={() => setShowUpload(s => !s)}
-          className="flex items-center gap-2 rounded-2xl border border-cyan-400/25 bg-cyan-400/8 px-4 py-2 text-xs font-bold uppercase tracking-widest text-cyan-400 transition-all hover:bg-cyan-400/15"
-        >
-          <Upload size={13} />
-          {showUpload ? "Cancelar" : "Nueva medición"}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowManual(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs font-bold text-slate-400 transition-all hover:border-white/[0.15] hover:text-slate-200">
+            <Pencil size={12} /> Manual
+          </button>
+          <button onClick={() => setShowAdd(s => !s)}
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-400/25 bg-cyan-400/8 px-3 py-2 text-xs font-bold text-cyan-400 transition-all hover:bg-cyan-400/15">
+            <Upload size={12} /> Captura
+          </button>
+        </div>
       </div>
 
-      {/* Upload colapsable */}
+      {/* Upload */}
       <AnimatePresence>
-        {(showUpload || !hasData) && (
+        {showAdd && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-            <Card>{<UploadZone onScanned={handleScanned} />}</Card>
+            <Card><UploadZone onScanned={handleScanned} /></Card>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Sin datos */}
       {!hasData && (
-        <div className="py-8 text-center text-sm text-slate-600">
-          Sube tu primera captura de báscula para comenzar el seguimiento.
+        <div className="py-12 text-center space-y-3">
+          <div className="text-slate-600 text-sm">Sin mediciones aún</div>
+          <div className="text-slate-700 text-xs">Sube una captura o agrega datos manualmente</div>
         </div>
       )}
 
       {/* Progreso hacia objetivo */}
-      {hasData && <GoalProgress scans={scans} />}
+      {hasData && <GoalBar scans={scans} />}
 
-      {/* Stats de la última medición */}
-      {latest && (
-        <div>
-          <div className="mb-3 text-[11px] uppercase tracking-widest text-slate-500">
-            Última medición — {latest.date}
-          </div>
-          <StatGrid scan={latest} prev={scans[1] ?? null} />
+      {/* Period selector */}
+      {hasData && (
+        <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1">
+          {PERIODS.map(p => (
+            <button key={p.key} onClick={() => setPeriod(p.key)}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
+                period === p.key
+                  ? "bg-cyan-400/15 text-cyan-400"
+                  : "text-slate-600 hover:text-slate-400"
+              }`}>
+              {p.label}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* Gráficos de evolución */}
-      {hasData && (
-        <div>
-          <div className="mb-3 text-[11px] uppercase tracking-widest text-slate-500">
-            Evolución
-            {scans.length < 2 && <span className="ml-2 text-slate-700">(agrega más mediciones para ver la curva)</span>}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {CHART_METRICS.map(m => {
-              const series = chartSeries(scans, m.key);
-              if (series.length === 0) return null;
-              return <MiniChart key={m.key} data={series} color={m.color} label={m.label} unit={m.unit} />;
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Historial */}
-      {hasData && (
-        <div>
-          <div className="mb-3 text-[11px] uppercase tracking-widest text-slate-500">
-            Historial · {scans.length} medición{scans.length > 1 ? "es" : ""}
-          </div>
-          <div className="space-y-2">
-            {scans.map((s, i) => (
-              <motion.div key={s.id} layout initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
-                <HistorialItem
-                  scan={s}
-                  prev={scans[i + 1] ?? null}
-                  onRemove={() => handleRemove(s.id)}
-                  isLatest={i === 0}
-                />
-              </motion.div>
+      {/* Métrica activa — gráfico principal */}
+      {hasData && availableMetrics.length > 0 && (
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+          {/* Metric tabs */}
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            {availableMetrics.map(m => (
+              <button key={m.key} onClick={() => setActiveMetric(m.key)}
+                className={`rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                  activeMetric === m.key
+                    ? ""
+                    : "border-white/[0.06] text-slate-600 hover:text-slate-400"
+                }`}
+                style={activeMetric === m.key ? {
+                  borderColor: `${m.color}50`,
+                  background: `${m.color}15`,
+                  color: m.color,
+                } : {}}>
+                {m.label}
+              </button>
             ))}
           </div>
+
+          {/* Stats strip */}
+          {activeStats && (
+            <div className="mb-4 flex gap-4 text-center">
+              {[
+                { label: "Actual",  value: `${activeStats.current.toFixed(1)}${activeMeta.unit}`, color: activeMeta.color },
+                { label: "Máx",     value: `${activeStats.max.toFixed(1)}${activeMeta.unit}`,     color: "#64748b" },
+                { label: "Mín",     value: `${activeStats.min.toFixed(1)}${activeMeta.unit}`,     color: "#64748b" },
+                { label: "Promedio",value: `${activeStats.avg.toFixed(1)}${activeMeta.unit}`,     color: "#64748b" },
+              ].map(s => (
+                <div key={s.label} className="flex-1 rounded-xl bg-white/[0.03] py-2 px-1">
+                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{s.label}</div>
+                  <div className="mt-0.5 font-mono text-sm font-bold" style={{ color: s.color }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <BodyChart
+            data={activePoints}
+            color={activeMeta.color}
+            unit={activeMeta.unit}
+            goodDown={activeMeta.goodDown}
+            height={160}
+          />
         </div>
       )}
+
+      {/* Historial colapsable */}
+      {hasData && (
+        <div>
+          <button onClick={() => setShowHistory(s => !s)}
+            className="flex w-full items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-left transition-all hover:border-white/[0.08]">
+            <span className="text-[11px] uppercase tracking-widest text-slate-500">
+              Historial · {scans.length} medición{scans.length > 1 ? "es" : ""}
+            </span>
+            {showHistory ? <ChevronUp size={14} className="text-slate-600" /> : <ChevronDown size={14} className="text-slate-600" />}
+          </button>
+
+          <AnimatePresence>
+            {showHistory && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                className="mt-2 space-y-2 overflow-hidden">
+                {scans.map((s, i) => (
+                  <motion.div key={s.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    className="flex items-center gap-3 rounded-xl border border-white/[0.04] bg-white/[0.02] px-4 py-3">
+                    {i === 0 && (
+                      <span className="shrink-0 rounded-md border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-cyan-400">
+                        último
+                      </span>
+                    )}
+                    {s.source === "manual" && (
+                      <span className="shrink-0 rounded-md border border-slate-500/25 bg-slate-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                        manual
+                      </span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-baseline gap-x-3">
+                        {s.peso_kg && <span className="font-mono text-sm font-black text-white">{s.peso_kg} kg</span>}
+                        {s.grasa_corporal_pct && <span className="text-xs text-slate-500">Grasa {s.grasa_corporal_pct}%</span>}
+                        {s.imc && <span className="text-xs font-semibold" style={{ color: imcColor(s.imc) }}>IMC {s.imc}</span>}
+                        {s.masa_musculoesqueletica_kg && <span className="text-xs text-slate-500">Músculo {s.masa_musculoesqueletica_kg}kg</span>}
+                      </div>
+                      <div className="text-[10px] text-slate-600">{s.date}</div>
+                    </div>
+                    <button onClick={() => handleRemove(s.id)} className="text-slate-700 hover:text-red-400 transition-colors shrink-0">
+                      <Trash2 size={13} />
+                    </button>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Modal entrada manual */}
+      <AnimatePresence>
+        {showManual && (
+          <ManualEntryForm onAdd={handleManual} onClose={() => setShowManual(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
