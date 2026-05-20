@@ -441,18 +441,28 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
                   className="w-full rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-2 py-1.5 text-xs font-mono text-white focus:border-emerald-400/50 focus:outline-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                {[
-                  { k: "Peso", v: extracted.peso_kg, u: "kg" },
-                  { k: "IMC",  v: extracted.imc, u: "" },
-                  { k: "Grasa", v: extracted.grasa_corporal_pct, u: "%" },
-                  { k: "Músculo", v: extracted.masa_musculoesqueletica_kg, u: "kg" },
-                ].filter(({ v }) => v != null).map(({ k, v, u }) => (
-                  <div key={k} className="flex items-baseline gap-1">
-                    <span className="text-[10px] text-slate-500">{k}:</span>
-                    <span className="font-mono text-sm font-bold text-white">{v as number}{u}</span>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                {([
+                  { k: "Peso",       v: extracted.peso_kg,                    u: " kg"   },
+                  { k: "IMC",        v: extracted.imc,                        u: ""      },
+                  { k: "Grasa",      v: extracted.grasa_corporal_pct,         u: "%"     },
+                  { k: "Músculo",    v: extracted.masa_musculoesqueletica_kg, u: " kg"   },
+                  { k: "Agua",       v: extracted.agua_corporal_pct,          u: "%"     },
+                  { k: "Visceral",   v: extracted.grasa_visceral_nivel,       u: " niv"  },
+                  { k: "Masa ósea",  v: extracted.masa_osea_kg,               u: " kg"   },
+                  { k: "Proteínas",  v: extracted.proteinas_pct,              u: "%"     },
+                  { k: "Masa libre", v: extracted.masa_libre_grasa_kg,        u: " kg"   },
+                  { k: "TMB",        v: extracted.tasa_metabolica_basal_kcal, u: " kcal" },
+                  { k: "F. cardíaca",v: extracted.frecuencia_cardiaca_ppm,    u: " ppm"  },
+                  { k: "Peso meta",  v: extracted.peso_objetivo_kg,           u: " kg"   },
+                ] as { k: string; v: unknown; u: string }[])
+                  .filter(({ v }) => v !== null && v !== undefined)
+                  .map(({ k, v, u }) => (
+                    <div key={k} className="flex items-baseline gap-1">
+                      <span className="text-[10px] text-slate-500">{k}:</span>
+                      <span className="font-mono text-xs font-bold text-white">{v as number}{u}</span>
+                    </div>
+                  ))}
               </div>
             </div>
           </div>
