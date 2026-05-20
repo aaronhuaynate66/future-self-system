@@ -33,9 +33,17 @@ export async function POST(req: NextRequest) {
               {
                 type: "text",
                 text: `Analiza esta captura de pantalla de una app de control de peso/báscula inteligente.
-Extrae TODOS los valores numéricos que encuentres y devuelve SOLO un JSON válido con esta estructura exacta (usa null si el campo no aparece en la imagen):
+Extrae TODOS los valores numéricos y la fecha que aparece en la pantalla.
+
+Para la fecha: busca cualquier fecha visible en la imagen (ej: "18 may. 2026", "19 abr. 2026 - 18 may. 2026", "12 may. 2026 - 18 may. 2026"). 
+- Si hay un rango de fechas, usa la fecha MÁS RECIENTE del rango.
+- Convierte siempre al formato yyyy-mm-dd (ej: "18 may. 2026" → "2026-05-18").
+- Si no hay fecha visible, usa null.
+
+Devuelve SOLO un JSON válido con esta estructura exacta (usa null si el campo no aparece):
 
 {
+  "fecha_medicion": "yyyy-mm-dd" | null,
   "peso_kg": number | null,
   "imc": number | null,
   "clasificacion_imc": string | null,
@@ -50,8 +58,7 @@ Extrae TODOS los valores numéricos que encuentres y devuelve SOLO un JSON váli
   "frecuencia_cardiaca_ppm": number | null,
   "peso_objetivo_kg": number | null,
   "peso_inicial_kg": number | null,
-  "total_perdido_kg": number | null,
-  "fecha_medicion": string | null
+  "total_perdido_kg": number | null
 }
 
 Responde ÚNICAMENTE con el JSON, sin explicaciones, sin markdown, sin texto adicional.`,

@@ -336,9 +336,10 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
   const [preview, setPreview] = useState<string | null>(null);
   const [errMsg, setErrMsg]   = useState("");
   const [extracted, setExtracted] = useState<Record<string, number | string | null> | null>(null);
+  const [confirmedDate, setConfirmedDate] = useState<string>("");
 
   const processFile = useCallback(async (file: File) => {
-    setState("loading"); setErrMsg(""); setExtracted(null);
+    setState("loading"); setErrMsg(""); setExtracted(null); setConfirmedDate("");
     const reader = new FileReader();
     reader.onload = e => setPreview(e.target?.result as string);
     reader.readAsDataURL(file);
@@ -353,7 +354,11 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
       body: JSON.stringify({ imageBase64: b64, mediaType: file.type || "image/jpeg" }),
     });
     if (!resp.ok) { setErrMsg((await resp.json()).error ?? "Error"); setState("error"); return; }
-    setExtracted((await resp.json()).data);
+    const data = (await resp.json()).data;
+    setExtracted(data);
+    const now = new Date();
+    const ds = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+    setConfirmedDate((data.fecha_medicion as string) ?? ds);
     setState("done");
   }, []);
 
@@ -368,7 +373,7 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
     const now = new Date();
     const ds = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
     onScanned({
-      date: (extracted.fecha_medicion as string) ?? ds,
+      date: confirmedDate || (extracted.fecha_medicion as string) || ds,
       peso_kg: extracted.peso_kg as number ?? null,
       imc: extracted.imc as number ?? null,
       clasificacion_imc: extracted.clasificacion_imc as string ?? null,
@@ -390,7 +395,7 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
     if (inputRef.current) inputRef.current.value = "";
   }
   function reset() {
-    setState("idle"); setPreview(null); setExtracted(null); setErrMsg("");
+    setState("idle"); setPreview(null); setExtracted(null); setErrMsg(""); setConfirmedDate("");
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -423,23 +428,37 @@ function UploadZone({ onScanned }: { onScanned: (data: Omit<BodyScan, "id">) => 
           </div>
           <div className="flex gap-3">
             {preview && <img src={preview} alt="scan" className="h-20 w-auto shrink-0 rounded-lg object-cover" />}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 flex-1">
-              {[
-                { k: "Peso", v: extracted.peso_kg, u: "kg" },
-                { k: "IMC",  v: extracted.imc, u: "" },
-                { k: "Grasa", v: extracted.grasa_corporal_pct, u: "%" },
-                { k: "Músculo", v: extracted.masa_musculoesqueletica_kg, u: "kg" },
-              ].filter(({ v }) => v != null).map(({ k, v, u }) => (
-                <div key={k} className="flex items-baseline gap-1">
-                  <span className="text-[10px] text-slate-500">{k}:</span>
-                  <span className="font-mono text-sm font-bold text-white">{v as number}{u}</span>
-                </div>
-              ))}
+            <div className="flex-1 space-y-2">
+              {/* Fecha — editable */}
+              <div>
+                <label className="mb-1 block text-[9px] uppercase tracking-widest text-slate-600">
+                  Fecha de medición
+                </label>
+                <input
+                  type="date"
+                  value={confirmedDate}
+                  onChange={e => setConfirmedDate(e.target.value)}
+                  className="w-full rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-2 py-1.5 text-xs font-mono text-white focus:border-emerald-400/50 focus:outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                {[
+                  { k: "Peso", v: extracted.peso_kg, u: "kg" },
+                  { k: "IMC",  v: extracted.imc, u: "" },
+                  { k: "Grasa", v: extracted.grasa_corporal_pct, u: "%" },
+                  { k: "Músculo", v: extracted.masa_musculoesqueletica_kg, u: "kg" },
+                ].filter(({ v }) => v != null).map(({ k, v, u }) => (
+                  <div key={k} className="flex items-baseline gap-1">
+                    <span className="text-[10px] text-slate-500">{k}:</span>
+                    <span className="font-mono text-sm font-bold text-white">{v as number}{u}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-          <button onClick={handleConfirm}
-            className="mt-3 w-full rounded-xl border border-emerald-500/25 bg-emerald-500/8 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/15 transition-all">
-            Guardar en historial
+          <button onClick={handleConfirm} disabled={!confirmedDate}
+            className="mt-3 w-full rounded-xl border border-emerald-500/25 bg-emerald-500/8 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/15 transition-all disabled:opacity-30">
+            Guardar · {confirmedDate || "sin fecha"}
           </button>
         </motion.div>
       )}
