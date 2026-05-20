@@ -347,7 +347,23 @@ export default function FinancialOSPage() {
         }];
         saveFinancialOS(local);
       }
-      if (remote.length > 0) {
+      // Si no hay transacciones, pre-cargar datos reales de mayo 2026
+      const allTxs = remote.length > 0 ? remote : local.transactions;
+      if (allTxs.length === 0) {
+        const seedTxs = [
+          // Ingresos
+          { id: "seed-1", date: "2026-05-01", amount: 6173.38, type: "income"  as const, category: "sueldo"   as const, intent: null, note: "Sueldo neto mayo 2026" },
+          // Gastos fijos obligatorios
+          { id: "seed-2", date: "2026-05-05", amount: 1120.86, type: "expense" as const, category: "vivienda"  as const, intent: "obligatorio" as const, note: "Terreno empresa" },
+          { id: "seed-3", date: "2026-05-05", amount:  656.25, type: "expense" as const, category: "transporte" as const, intent: "obligatorio" as const, note: "Terreno personal" },
+          { id: "seed-4", date: "2026-05-05", amount:  847.06, type: "expense" as const, category: "salud"     as const, intent: "obligatorio" as const, note: "Seguro Pacífico / MedicVida" },
+        ];
+        const seeded = { ...local, transactions: seedTxs };
+        setData(seeded);
+        saveFinancialOS(seeded);
+        // Sincronizar seeds a Supabase
+        seedTxs.forEach(tx => dbSaveTransaction(tx).catch(console.error));
+      } else if (remote.length > 0) {
         const updated = { ...local, transactions: remote };
         setData(updated);
         saveFinancialOS(updated);
