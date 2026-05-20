@@ -423,7 +423,6 @@ export default function CuerpoPage() {
   const [showAdd, setShowAdd]   = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [activeMetric, setActiveMetric] = useState<MetricKey>("peso_kg");
 
   useEffect(() => { setScans(loadScans()); setMounted(true); }, []);
 
@@ -450,9 +449,6 @@ export default function CuerpoPage() {
     scans.some(s => s[m.key] !== null && s[m.key] !== undefined)
   );
 
-  const activeMeta = METRICS.find(m => m.key === activeMetric) ?? METRICS[0];
-  const activePoints = aggregateSeries(scans, activeMetric, period);
-  const activeStats  = periodStats(activePoints);
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6">
@@ -514,52 +510,59 @@ export default function CuerpoPage() {
         </div>
       )}
 
-      {/* Métrica activa — gráfico principal */}
+      {/* Grid de TODAS las métricas */}
       {hasData && availableMetrics.length > 0 && (
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-          {/* Metric tabs */}
-          <div className="mb-4 flex flex-wrap gap-1.5">
-            {availableMetrics.map(m => (
-              <button key={m.key} onClick={() => setActiveMetric(m.key)}
-                className={`rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                  activeMetric === m.key
-                    ? ""
-                    : "border-white/[0.06] text-slate-600 hover:text-slate-400"
-                }`}
-                style={activeMetric === m.key ? {
-                  borderColor: `${m.color}50`,
-                  background: `${m.color}15`,
-                  color: m.color,
-                } : {}}>
-                {m.label}
-              </button>
-            ))}
+        <div className="space-y-3">
+          <div className="text-[11px] uppercase tracking-widest text-slate-500">
+            Evolución por métrica — {availableMetrics.length} disponibles
           </div>
-
-          {/* Stats strip */}
-          {activeStats && (
-            <div className="mb-4 flex gap-4 text-center">
-              {[
-                { label: "Actual",  value: `${activeStats.current.toFixed(1)}${activeMeta.unit}`, color: activeMeta.color },
-                { label: "Máx",     value: `${activeStats.max.toFixed(1)}${activeMeta.unit}`,     color: "#64748b" },
-                { label: "Mín",     value: `${activeStats.min.toFixed(1)}${activeMeta.unit}`,     color: "#64748b" },
-                { label: "Promedio",value: `${activeStats.avg.toFixed(1)}${activeMeta.unit}`,     color: "#64748b" },
-              ].map(s => (
-                <div key={s.label} className="flex-1 rounded-xl bg-white/[0.03] py-2 px-1">
-                  <div className="text-[9px] uppercase tracking-widest text-slate-600">{s.label}</div>
-                  <div className="mt-0.5 font-mono text-sm font-bold" style={{ color: s.color }}>{s.value}</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {availableMetrics.map(m => {
+              const points = aggregateSeries(scans, m.key, period);
+              const stats  = periodStats(points);
+              return (
+                <div key={m.key} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                  {/* Header */}
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full" style={{ background: m.color }} />
+                      <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: m.color }}>
+                        {m.label}
+                      </span>
+                    </div>
+                    {stats && (
+                      <div className="flex gap-2 text-[9px] text-slate-600">
+                        <span title="Máximo">↑{stats.max.toFixed(1)}</span>
+                        <span title="Mínimo">↓{stats.min.toFixed(1)}</span>
+                        <span title="Promedio">⌀{stats.avg.toFixed(1)}</span>
+                      </div>
+                    )}
+                  </div>
+                  {/* Valor actual + delta */}
+                  {stats && (
+                    <div className="mb-3 flex items-baseline gap-2">
+                      <span className="text-2xl font-black tabular-nums" style={{ color: m.color }}>
+                        {stats.current.toFixed(1)}
+                        <span className="text-xs font-normal text-slate-600 ml-0.5">{m.unit}</span>
+                      </span>
+                      {points.length >= 2 && (() => {
+                        const delta = stats.current - stats.first;
+                        const isGood = m.goodDown ? delta <= 0 : delta >= 0;
+                        const dc = delta === 0 ? "#64748b" : isGood ? "#22d3a5" : "#f43f5e";
+                        return (
+                          <span className="text-sm font-bold" style={{ color: dc }}>
+                            {delta > 0 ? "+" : ""}{delta.toFixed(1)}{m.unit}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
+                  {/* Gráfico */}
+                  <BodyChart data={points} color={m.color} unit={m.unit} goodDown={m.goodDown} height={90} />
                 </div>
-              ))}
-            </div>
-          )}
-
-          <BodyChart
-            data={activePoints}
-            color={activeMeta.color}
-            unit={activeMeta.unit}
-            goodDown={activeMeta.goodDown}
-            height={160}
-          />
+              );
+            })}
+          </div>
         </div>
       )}
 
