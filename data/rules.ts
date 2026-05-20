@@ -10,9 +10,22 @@ export const FUTURE_SELF_RULES: { id: string; text: string }[] = [
 export const MISSION = "Conseguir paz.";
 export const MISSION_SUB = "Menos ruido. Más enfoque. Más estructura.";
 
-export const PLAN_START = "2026-06-01";
-export const PLAN_END = "2026-08-31";
+export const PLAN_START  = "2026-06-01";
+export const PLAN_END    = "2026-08-31";
 export const WORLDS_DATE = "2026-11-01";
+
+// Datos financieros reales
+export const INCOME_ACTUAL   = 6173.38;  // Sueldo neto actual
+export const INCOME_GOAL     = 15000;    // Meta mensual
+export const CLIENT_GOAL     = 5000;     // Cliente recurrente mínimo
+export const MARLAB_ANNUAL   = 1000000;  // Meta anual MarLab
+
+// Gastos fijos mensuales
+export const FIXED_EXPENSES = {
+  terreno_empresa:  1120.86,
+  terreno_personal:  656.25,
+  seguro_pacifico:   847.06,
+};
 
 // Umbral de score para activar Recovery Mode
 export const RECOVERY_THRESHOLD = 45;

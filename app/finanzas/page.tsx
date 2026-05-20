@@ -328,18 +328,36 @@ export default function FinancialOSPage() {
   const month = currentMonth();
 
   useEffect(() => {
-    // Cargar desde Supabase, fallback a localStorage
     dbLoadTransactions().then(remote => {
+      const local = loadFinancialOS();
+      // Si no hay presupuesto, crear uno con datos reales
+      if (local.budgets.length === 0) {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        local.budgets = [{
+          month: currentMonth,
+          incomeGoal: 15000,   // Meta S/ 15,000/mes
+          savingGoal: 2000,
+          categories: {
+            vivienda:     1120, // Terreno empresa
+            servicios:     847, // Seguro Pacífico
+            transporte:    656, // Terreno personal
+            alimentacion:  800,
+            hormiga:       300,
+          },
+        }];
+        saveFinancialOS(local);
+      }
       if (remote.length > 0) {
-        const updated = { ...loadFinancialOS(), transactions: remote };
+        const updated = { ...local, transactions: remote };
         setData(updated);
         saveFinancialOS(updated);
       } else {
-        setData(loadFinancialOS());
+        setData(local);
       }
       setMounted(true);
     }).catch(() => {
-      setData(loadFinancialOS());
+      const local = loadFinancialOS();
+      setData(local);
       setMounted(true);
     });
   }, []);
